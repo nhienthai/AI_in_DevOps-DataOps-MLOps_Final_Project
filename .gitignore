@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Environment
+.env
+
+# Data & models (never commit)
+data/raw/
+data/processed/
+data/interim/
+*.parquet
+*.pkl
+*.pt
+*.bin
+*.onnx
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
