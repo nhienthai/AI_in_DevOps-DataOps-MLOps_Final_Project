@@ -2215,7 +2215,7 @@ groups:
         annotations:
           summary: "Sentiment API is not being scraped"
           description: "Prometheus cannot reach the API target."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#apidown"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#apidown"
 
       - alert: HighErrorRate
         expr: |
@@ -2226,7 +2226,7 @@ groups:
         annotations:
           summary: "5xx rate above 5% for 5 minutes"
           description: "{{ $value | humanizePercentage }} of requests are failing."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#higherrorrate"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#higherrorrate"
 
       - alert: HighLatencyP95
         expr: |
@@ -2238,7 +2238,7 @@ groups:
         annotations:
           summary: "p95 latency above 500ms (2.5x the 200ms SLO)"
           description: "P95 latency is {{ $value }}s."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#highlatencyp95"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#highlatencyp95"
 ```
 
 `prometheus/alerts/ml_alerts.yml` — the first, fourth, and fifth rules are Lab 4's,
@@ -2255,7 +2255,7 @@ groups:
         annotations:
           summary: "ML model not loaded"
           description: "The API is up but no model is loaded; predictions return 503."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#modelnotloaded"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#modelnotloaded"
 
       - alert: PredictionSkew
         expr: |
@@ -2269,7 +2269,7 @@ groups:
         annotations:
           summary: "Positive-class rate deviates more than 20pp from the training prior"
           description: "Positive share has drifted to {{ $value | humanizePercentage }} away from 0.5."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#predictionskew"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#predictionskew"
 
       - alert: DriftDetected
         expr: ml_drift_psi > 0.2
@@ -2278,7 +2278,7 @@ groups:
         annotations:
           summary: "Input length PSI above 0.2 (conventional significant-shift boundary)"
           description: "PSI is {{ $value }} against the training reference."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#driftdetected"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#driftdetected"
 
       - alert: HighPredictionErrorRate
         expr: |
@@ -2289,7 +2289,7 @@ groups:
         annotations:
           summary: "High prediction error rate"
           description: "{{ $value | humanizePercentage }} of predictions are failing."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#highpredictionerrorrate"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#highpredictionerrorrate"
 
       - alert: ModelStale
         expr: time() - ml_model_last_reload_timestamp > 604800
@@ -2298,7 +2298,7 @@ groups:
         annotations:
           summary: "ML model may be stale"
           description: "Model has not been reloaded in {{ $value | humanizeDuration }}."
-          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#modelstale"
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#modelstale"
 ```
 
 - [ ] **Step 3: Create the Alertmanager and Grafana provisioning files**
@@ -2744,7 +2744,7 @@ Expected: `ok:` for all eight anchors. Fix any `MISSING:` before committing.
 
 - [ ] **Step 6: Replace the `OWNER` placeholder in the alert runbook URLs**
 
-Run: `grep -rn 'github.com/OWNER' prometheus/`
+Run: `grep -rn 'github.com/OWNER' prometheus/` (should already be empty — the URLs were resolved to the real repo when the project moved to the repository root)
 Expected: no results after you substitute your real GitHub org/user. This is the
 one intentional placeholder in the plan and it must not survive Task 12.
 

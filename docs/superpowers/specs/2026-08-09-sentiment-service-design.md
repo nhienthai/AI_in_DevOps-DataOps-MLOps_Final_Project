@@ -233,7 +233,7 @@ Lab 3 CI pipeline can be reused rather than reinvented. Deviations from the labs
 are noted inline.
 
 ```
-sentiment-service/
+AI_in_DevOps-DataOps-MLOps_Final_Project/   (repository root)
 ├── README.md                    project overview, badges, quickstart, troubleshooting
 ├── ARCHITECTURE.md              system design (derived from §2 of this spec)
 ├── CONTRIBUTING.md              team roles, branching, commit conventions

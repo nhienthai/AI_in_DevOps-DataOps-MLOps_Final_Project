@@ -151,7 +151,7 @@ presentation grade and rehearsal time is what protects it.
 
 | ID | Task | Owner | Depends on | Status |
 |---|---|---|---|---|
-| W4-01 | Replace `github.com/OWNER` in every `runbook_url` with the real repo | M4 | — | TODO |
+| W4-01 | ~~Replace `github.com/OWNER` in every `runbook_url` with the real repo~~ — resolved to `nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project` when the project moved to the repository root | M4 | — | DONE |
 | W4-02 | README polish: badges, quickstart, `curl` examples with real output, troubleshooting | M5 | — | TODO |
 | W4-03 | `ARCHITECTURE.md` final pass; diagrams match what actually runs | M5 | — | TODO |
 | W4-04 | `CONTRIBUTING.md` with real names and per-member contribution summary | M5 | — | TODO |
