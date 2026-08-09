@@ -6,14 +6,22 @@
 
 **Architecture:** A `src/sentiment/` package split into `data/` (ingest, validate, preprocess), `serving/` (FastAPI app, predictor protocol, metrics), and `config.py`. The serving layer depends on a `Predictor` Protocol, not on a concrete model, so Week 2's DistilBERT drops in without touching the API. All ML metrics are computed in-process. Docker Compose runs api, mlflow, postgres, prometheus, grafana, alertmanager with health checks throughout.
 
-**Tech Stack:** Python 3.11, FastAPI, pydantic v2 + pydantic-settings, prometheus-client, pandas + pyarrow, numpy, HuggingFace `datasets`, pytest + httpx, ruff, mypy, Docker Compose, GitHub Actions.
+**Tech Stack:** Python 3.10/3.11, FastAPI, pydantic v2 + pydantic-settings, prometheus-client, pandas + pyarrow, numpy, HuggingFace `datasets`, pytest + `fastapi.testclient`, flake8 + black + isort, mypy, Docker Compose, GitHub Actions.
 
 ## Global Constraints
 
-- Python 3.11 exactly (pinned in `pyproject.toml`, Dockerfiles, and CI matrix).
+**Course conventions.** This project follows the structure and naming established
+in DDM501 Labs 1-4 and the `stock-signal-mlops` assignment, so lab dashboards, CI
+config, and middleware port over instead of being rebuilt. Where this plan and a
+lab disagree, the lab wins unless a rationale is given inline.
+
+- Python `>=3.10`; CI runs a 3.10 / 3.11 matrix (Lab 3).
 - Package root is `src/sentiment/`; all imports are absolute (`from sentiment.data import ...`).
-- Every public function has type hints and a docstring; `mypy --strict` must pass on `src/`.
+- Lint and format with **flake8 + black + isort, pinned** — not ruff (Lab 3 toolchain).
+- Every public function has type hints and a docstring; mypy must pass on `src/` and `scripts/`.
 - Coverage gate `--cov-fail-under=80` is active from Task 1 and never lowered.
+- **Metric names use the Lab 4 `http_*` / `ml_*` convention.** Never invent a
+  `sentiment_*` prefix — Lab 4's Grafana dashboards query these names.
 - `score` is P(positive) in [0,1]; `confidence` is `max(score, 1-score)` in [0.5,1]. Never conflate.
 - Labels: `0` = negative, `1` = positive (matches HuggingFace `amazon_polarity`).
 - Label strings in API responses: `"positive"` / `"negative"` (lowercase).
@@ -21,6 +29,12 @@
 - Settings are read via `sentiment.config.get_settings()`, never `os.environ` directly.
 - Env var prefix is `SENTIMENT_`.
 - API routes live under `/api/v1`; operational routes (`/health`, `/ready`, `/metrics`) are unprefixed.
+- Integration tests use `fastapi.testclient.TestClient` **as a context manager**, so
+  the lifespan runs and the model is loaded (Lab 3 `conftest.py`; without it every
+  prediction returns 503).
+- Paths follow the labs: `Dockerfile` at root, `prometheus/`, `grafana/`,
+  `alertmanager/`, `scripts/`, `models/` at root; tests in
+  `tests/{unit,integration,data,model}/`, each a package with `__init__.py`.
 - Commit after every task. Conventional Commits (`feat:`, `test:`, `chore:`, `docs:`, `ci:`).
 
 ---
@@ -28,9 +42,10 @@
 ### Task 1: Project scaffold, tooling, and configuration
 
 **Files:**
-- Create: `pyproject.toml`, `Makefile`, `.env.example`
+- Create: `pyproject.toml`, `requirements.txt`, `requirements-dev.txt`, `.flake8`, `Makefile`, `.env.example`
 - Create: `src/sentiment/__init__.py`, `src/sentiment/config.py`
 - Create: `src/sentiment/data/__init__.py`, `src/sentiment/serving/__init__.py`
+- Create: `tests/__init__.py`, `tests/conftest.py`, and `__init__.py` in each test package
 - Test: `tests/unit/test_config.py`
 
 **Interfaces:**
@@ -41,100 +56,183 @@
 
 - [ ] **Step 1: Create `pyproject.toml`**
 
+Configuration only — dependencies live in `requirements*.txt`, as in the labs.
+
 ```toml
+# =============================================================================
+# Project configuration
+# DDM501 - Final Project: Sentiment Analysis Service
+# Tooling mirrors Lab 3 so the CI pipeline ports over unchanged.
+# =============================================================================
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sentiment-service"
 version = "0.1.0"
 description = "Real-time sentiment analysis service for e-commerce reviews"
-requires-python = "==3.11.*"
-dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.32",
-    "pydantic>=2.9",
-    "pydantic-settings>=2.6",
-    "prometheus-client>=0.21",
-    "pandas>=2.2",
-    "pyarrow>=18.0",
-    "numpy>=1.26",
-    "datasets>=3.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.3",
-    "pytest-cov>=6.0",
-    "pytest-asyncio>=0.24",
-    "httpx>=0.27",
-    "ruff>=0.7",
-    "mypy>=1.13",
-    "pandas-stubs",
-]
-
-[build-system]
-requires = ["setuptools>=75"]
-build-backend = "setuptools.build_meta"
+readme = "README.md"
+requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.ruff]
+[tool.black]
 line-length = 100
-target-version = "py311"
+target-version = ['py310']
 
-[tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "SIM", "D"]
-ignore = ["D203", "D213"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D"]
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".venv", "__pycache__"]
 
 [tool.mypy]
-python_version = "3.11"
-strict = true
-files = ["src"]
-
-[[tool.mypy.overrides]]
-module = ["datasets.*", "sklearn.*"]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
 ignore_missing_imports = true
+exclude = ["venv", "__pycache__", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
 markers = [
-    "slow: tests that load or train large models (excluded from PR CI)",
+    "slow: tests that load or train large models (deselect with -m 'not slow')",
     "integration: tests requiring a running stack",
 ]
-addopts = "--cov=sentiment --cov-report=term-missing --cov-report=xml --cov-fail-under=80"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]
 
 [tool.coverage.run]
 source = ["src/sentiment"]
-omit = ["*/__init__.py"]
+omit = ["tests/*", "*/__pycache__/*", "*/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"
 ```
 
-- [ ] **Step 2: Create the package skeleton and Makefile**
+- [ ] **Step 2: Create the dependency files and flake8 config**
+
+`requirements.txt` (runtime only — this is what ships in the image):
+
+```
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+prometheus-client==0.21.1
+pandas==2.2.3
+pyarrow==18.1.0
+numpy==1.26.4
+datasets==3.2.0
+```
+
+`requirements-dev.txt`:
+
+```
+-r requirements.txt
+pytest==8.3.4
+pytest-cov==6.0.0
+httpx==0.28.1
+flake8==7.0.0
+black==23.12.1
+isort==5.13.2
+mypy==1.8.0
+pandas-stubs==2.3.3.260113
+types-requests
+```
+
+The lint versions are pinned to exactly what Lab 3's CI installs. Pinning matters
+here for a specific reason: an unpinned `black` or `pandas-stubs` release can turn
+the build red with no code change, which is the most demoralising possible CI
+failure for a five-person team.
+
+`.flake8`:
+
+```ini
+[flake8]
+max-line-length = 100
+extend-ignore = E203, W503
+exclude = .git,__pycache__,.venv,venv,build,dist,notebooks
+per-file-ignores =
+    tests/*:D
+```
+
+- [ ] **Step 3: Create the package and test skeletons, and the Makefile**
 
 ```bash
-mkdir -p src/sentiment/data src/sentiment/serving tests/unit tests/integration tests/data_quality tests/model
-touch src/sentiment/__init__.py src/sentiment/data/__init__.py src/sentiment/serving/__init__.py
+mkdir -p src/sentiment/{data,models,training,serving,responsible} \
+         tests/{unit,integration,data,model} scripts
+touch src/sentiment/__init__.py \
+      src/sentiment/data/__init__.py src/sentiment/models/__init__.py \
+      src/sentiment/training/__init__.py src/sentiment/serving/__init__.py \
+      src/sentiment/responsible/__init__.py \
+      tests/__init__.py tests/unit/__init__.py tests/integration/__init__.py \
+      tests/data/__init__.py tests/model/__init__.py
+```
+
+`tests/conftest.py` — the shared client fixture every integration test uses.
+It follows Lab 3: the `TestClient` is a context manager so the lifespan runs.
+
+```python
+"""Shared pytest fixtures for all tests."""
+
+from typing import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+
+from sentiment.serving.app import create_app
+
+
+@pytest.fixture(scope="session")
+def client() -> Iterator[TestClient]:
+    """Test client with the application lifespan actually running.
+
+    Used as a context manager deliberately: without it the lifespan never
+    fires, the predictor stays None, and every prediction returns 503.
+    """
+    with TestClient(create_app()) as test_client:
+        yield test_client
 ```
 
 `Makefile`:
 
 ```makefile
-.PHONY: install lint typecheck test up down smoke
+.PHONY: install lint format typecheck test up down smoke
 
 install:
-	pip install -e ".[dev]"
+	pip install -e . && pip install -r requirements-dev.txt
 
 lint:
-	ruff check src tests
-	ruff format --check src tests
+	flake8 src tests scripts
+	black --check --diff src tests scripts
+	isort --check-only --diff src tests scripts
+
+format:
+	black src tests scripts
+	isort src tests scripts
 
 typecheck:
-	mypy
+	mypy src scripts
 
 test:
-	pytest -m "not slow" -v
+	pytest -m "not slow and not integration" \
+	  --cov=sentiment --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 
 up:
 	docker compose up -d
@@ -143,10 +241,10 @@ down:
 	docker compose down -v
 
 smoke:
-	pytest tests/integration -m integration -v
+	pytest tests/integration -m integration -v --no-cov
 ```
 
-- [ ] **Step 3: Write the failing test for configuration**
+- [ ] **Step 4: Write the failing test for configuration**
 
 `tests/unit/test_config.py`:
 
@@ -178,12 +276,12 @@ def test_get_settings_is_cached():
     assert get_settings() is get_settings()
 ```
 
-- [ ] **Step 4: Run the test to verify it fails**
+- [ ] **Step 5: Run the test to verify it fails**
 
 Run: `pytest tests/unit/test_config.py -v --no-cov`
 Expected: FAIL — `ModuleNotFoundError: No module named 'sentiment.config'`
 
-- [ ] **Step 5: Implement `src/sentiment/config.py`**
+- [ ] **Step 6: Implement `src/sentiment/config.py`**
 
 ```python
 """Application configuration, read once from the environment."""
@@ -233,7 +331,7 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
-- [ ] **Step 6: Create `.env.example`**
+- [ ] **Step 7: Create `.env.example`**
 
 ```bash
 # Copy to .env and adjust. Never commit .env.
@@ -246,35 +344,23 @@ POSTGRES_DB=mlflow
 GRAFANA_ADMIN_PASSWORD=change-me-locally
 ```
 
-- [ ] **Step 7: Run tests and lint to verify they pass**
+- [ ] **Step 8: Run tests and the full lint suite to verify they pass**
 
-Run: `pip install -e ".[dev]" && pytest tests/unit/test_config.py -v --no-cov && ruff check src tests && mypy`
-Expected: 3 passed, no lint errors, no type errors.
-
-- [ ] **Step 8: Generate `requirements.txt`**
-
-The brief lists `requirements.txt` as a required file, but `pyproject.toml` is the
-source of truth. Generate it as a pinned lock of the runtime dependencies only,
-and add a `deps` target so it is regenerated rather than hand-edited.
-
-Append to the `Makefile`:
-
-```makefile
-.PHONY: deps
-
-deps:
-	pip install pip-tools
-	pip-compile --output-file=requirements.txt --strip-extras pyproject.toml
+```bash
+make install
+pytest tests/unit/test_config.py -v --no-cov
+make lint
+make typecheck
 ```
 
-Run: `make deps`
-Expected: `requirements.txt` exists and pins every runtime dependency with hashes
-of the resolved versions. Re-run this target whenever `pyproject.toml` changes.
+Expected: 3 passed, flake8/black/isort clean, mypy clean.
+If black reports reformatting, run `make format` and re-check — do not hand-fix
+formatting, the whole point of black is that nobody argues about it.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add pyproject.toml requirements.txt Makefile .env.example src tests
+git add pyproject.toml requirements.txt requirements-dev.txt .flake8 Makefile .env.example src tests
 git commit -m "chore: scaffold package, tooling, and settings"
 ```
 
@@ -411,7 +497,7 @@ git commit -m "feat: add raw data ingestion and normalisation"
 
 **Files:**
 - Create: `src/sentiment/data/validate.py`
-- Test: `tests/data_quality/test_validate.py`
+- Test: `tests/data/test_validate.py`
 
 **Interfaces:**
 - Consumes: `normalise` output shape (`["label", "text"]`).
@@ -426,7 +512,7 @@ git commit -m "feat: add raw data ingestion and normalisation"
 
 - [ ] **Step 1: Write the failing tests**
 
-`tests/data_quality/test_validate.py`:
+`tests/data/test_validate.py`:
 
 ```python
 import pandas as pd
@@ -491,7 +577,7 @@ def test_validate_returns_report_on_success():
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pytest tests/data_quality/test_validate.py -v --no-cov`
+Run: `pytest tests/data/test_validate.py -v --no-cov`
 Expected: FAIL — `ModuleNotFoundError: No module named 'sentiment.data.validate'`
 
 - [ ] **Step 3: Implement `src/sentiment/data/validate.py`**
@@ -596,13 +682,13 @@ def validate(df: pd.DataFrame, **kwargs: float | int) -> QualityReport:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pytest tests/data_quality/test_validate.py -v --no-cov`
+Run: `pytest tests/data/test_validate.py -v --no-cov`
 Expected: 8 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/sentiment/data/validate.py tests/data_quality/test_validate.py
+git add src/sentiment/data/validate.py tests/data/test_validate.py
 git commit -m "feat: add data quality gate with failing validation"
 ```
 
@@ -988,8 +1074,11 @@ git commit -m "feat: add predictor protocol and deterministic stub"
   - `DriftTracker(reference: DriftReference, window_size: int = 1000)` with
     `observe(text_length: int) -> None`, `psi() -> float`, and `__len__`.
     Returns `0.0` until at least `MIN_OBSERVATIONS` (30) samples.
-  - Module-level collectors: `REQUESTS`, `DURATION`, `PREDICTIONS`, `CONFIDENCE`,
-    `LOW_CONFIDENCE`, `INPUT_LENGTH`, `DRIFT_PSI`, `MODEL_INFO`.
+  - Module-level collectors, keeping Lab 4's names so its Grafana dashboards work:
+    `REQUEST_COUNT`, `REQUEST_LATENCY`, `PREDICTION_COUNT`, `PREDICTION_LATENCY`,
+    `PREDICTION_ERRORS`, `MODEL_LOADED`, `MODEL_INFO`, `MODEL_LAST_RELOAD`,
+    `BATCH_SIZE`, plus this project's additions `PREDICTION_CONFIDENCE`,
+    `LOW_CONFIDENCE`, `INPUT_LENGTH`, `DRIFT_PSI`, `FAIRNESS_MAX_DELTA`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1078,50 +1167,93 @@ from collections import deque
 from collections.abc import Sequence
 
 import numpy as np
-from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client import Counter, Gauge, Histogram, Info
 
 from sentiment.data.preprocess import DriftReference
 
 MIN_OBSERVATIONS = 30
 
-REQUESTS = Counter(
-    "sentiment_requests_total",
-    "Total API requests.",
-    ["endpoint", "status", "model_version"],
+# ---------------------------------------------------------------------------
+# HTTP metrics. Names and labels are Lab 4's, unchanged, so that lab's
+# system_dashboard.json imports and works without editing a single query.
+# Recorded by MetricsMiddleware, never per-endpoint.
+# ---------------------------------------------------------------------------
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total number of HTTP requests",
+    ["method", "endpoint", "status"],
 )
-DURATION = Histogram(
-    "sentiment_request_duration_seconds",
-    "Request latency in seconds.",
-    ["endpoint"],
-    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1.0, 2.5, 5.0),
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["method", "endpoint"],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
 )
-PREDICTIONS = Counter(
-    "sentiment_predictions_total",
-    "Predictions issued, by label.",
+
+# ---------------------------------------------------------------------------
+# ML metrics. Lab 4 names, with one deliberate change: PREDICTION_COUNT gains a
+# `label` dimension, because class skew is a real signal for a classifier
+# whereas Lab 4 predicted a continuous rating.
+# ---------------------------------------------------------------------------
+PREDICTION_COUNT = Counter(
+    "ml_predictions_total",
+    "Total number of predictions made",
     ["label", "model_version"],
 )
-CONFIDENCE = Histogram(
-    "sentiment_confidence",
-    "Distribution of prediction confidence.",
-    buckets=(0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0),
+PREDICTION_LATENCY = Histogram(
+    "ml_prediction_duration_seconds",
+    "Time to generate a prediction",
+    ["model_version"],
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
+)
+PREDICTION_ERRORS = Counter(
+    "ml_prediction_errors_total",
+    "Total number of prediction errors",
+    ["error_type", "model_version"],
+)
+MODEL_LOADED = Gauge(
+    "ml_model_loaded",
+    "Whether the ML model is loaded (1) or not (0)",
+)
+MODEL_INFO = Info(
+    "ml_model_info",
+    "Information about the loaded ML model",
+)
+MODEL_LAST_RELOAD = Gauge(
+    "ml_model_last_reload_timestamp",
+    "Unix timestamp of last model reload",
+)
+BATCH_SIZE = Histogram(
+    "ml_batch_prediction_size",
+    "Size of batch prediction requests",
+    buckets=[1, 5, 10, 25, 50, 100],
+)
+
+# ---------------------------------------------------------------------------
+# Custom metrics added by this project. Each exists because a specific alert or
+# dashboard panel needs it; none is here to pad the count.
+# ---------------------------------------------------------------------------
+PREDICTION_CONFIDENCE = Histogram(
+    "ml_prediction_confidence",
+    "Distribution of prediction confidence",
+    buckets=[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0],
 )
 LOW_CONFIDENCE = Counter(
-    "sentiment_low_confidence_total",
-    "Predictions below the low-confidence threshold.",
+    "ml_low_confidence_total",
+    "Predictions below the low-confidence threshold",
 )
 INPUT_LENGTH = Histogram(
-    "sentiment_input_length_chars",
-    "Distribution of input text length in characters.",
-    buckets=(16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192),
+    "ml_input_length_chars",
+    "Distribution of input text length in characters",
+    buckets=[16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192],
 )
 DRIFT_PSI = Gauge(
-    "sentiment_drift_psi",
-    "Population stability index of live input lengths against the training reference.",
+    "ml_drift_psi",
+    "Population stability index of live input lengths against the training reference",
 )
-MODEL_INFO = Gauge(
-    "sentiment_model_info",
-    "Always 1; labels carry the served model's provenance.",
-    ["version"],
+FAIRNESS_MAX_DELTA = Gauge(
+    "ml_fairness_max_delta",
+    "Maximum EEC identity-pair score delta measured for the served model",
 )
 
 
@@ -1192,7 +1324,7 @@ git commit -m "feat: add prometheus collectors and PSI drift tracker"
 ### Task 7: API schemas, typed errors, and the FastAPI app
 
 **Files:**
-- Create: `src/sentiment/serving/schemas.py`, `src/sentiment/serving/errors.py`, `src/sentiment/serving/app.py`
+- Create: `src/sentiment/serving/schemas.py`, `src/sentiment/serving/errors.py`, `src/sentiment/serving/middleware.py`, `src/sentiment/serving/app.py`
 - Test: `tests/integration/test_app_health.py`
 
 **Interfaces:**
@@ -1210,56 +1342,52 @@ git commit -m "feat: add prometheus collectors and PSI drift tracker"
 
 `tests/integration/test_app_health.py`:
 
+The `client` fixture comes from `tests/conftest.py` (Task 1) — it is a
+`TestClient` used as a context manager, so the lifespan runs and the predictor
+is loaded.
+
 ```python
-import httpx
-import pytest
-
-from sentiment.serving.app import create_app
+from fastapi.testclient import TestClient
 
 
-@pytest.fixture
-async def client():
-    app = create_app()
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        async with app.router.lifespan_context(app):
-            yield c
-
-
-async def test_health_is_up_and_independent_of_the_model(client: httpx.AsyncClient):
-    response = await client.get("/health")
+def test_health_is_up_and_independent_of_the_model(client: TestClient):
+    response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
 
-async def test_ready_reports_the_loaded_model(client: httpx.AsyncClient):
-    response = await client.get("/ready")
+def test_ready_reports_the_loaded_model(client: TestClient):
+    response = client.get("/ready")
     assert response.status_code == 200
     assert response.json()["model_version"] == "stub-0"
 
 
-async def test_metrics_endpoint_exposes_prometheus_text(client: httpx.AsyncClient):
-    response = await client.get("/metrics")
+def test_metrics_endpoint_exposes_prometheus_text(client: TestClient):
+    response = client.get("/metrics")
     assert response.status_code == 200
-    assert "sentiment_requests_total" in response.text
+    assert "http_requests_total" in response.text
 
 
-async def test_openapi_spec_is_generated(client: httpx.AsyncClient):
-    spec = (await client.get("/openapi.json")).json()
+def test_model_loaded_gauge_is_set(client: TestClient):
+    assert "ml_model_loaded 1.0" in client.get("/metrics").text
+
+
+def test_openapi_spec_is_generated(client: TestClient):
+    spec = client.get("/openapi.json").json()
     assert spec["info"]["title"] == "Sentiment Service"
     assert "/ready" in spec["paths"]
 
 
-async def test_unknown_route_returns_typed_error(client: httpx.AsyncClient):
-    response = await client.get("/api/v1/nope")
+def test_unknown_route_returns_typed_error(client: TestClient):
+    response = client.get("/api/v1/nope")
     assert response.status_code == 404
     body = response.json()
     assert body["error_code"] == "not_found"
     assert "request_id" in body
 
 
-async def test_every_response_carries_a_request_id_header(client: httpx.AsyncClient):
-    assert (await client.get("/health")).headers["x-request-id"]
+def test_every_response_carries_a_request_id_header(client: TestClient):
+    assert client.get("/health").headers["x-request-id"]
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1394,12 +1522,56 @@ def install_error_handlers(app: FastAPI) -> None:
         )
 ```
 
-- [ ] **Step 5: Implement `src/sentiment/serving/app.py` with health, ready, and metrics**
+- [ ] **Step 5: Implement `src/sentiment/serving/middleware.py`**
+
+This is Lab 4's `MetricsMiddleware`, adapted to also carry the request id. HTTP
+metrics live here rather than in each endpoint so that coverage cannot drift as
+routes are added.
+
+```python
+"""Middleware collecting HTTP metrics and tagging each request with an id."""
+
+import time
+import uuid
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+from sentiment.serving.metrics import REQUEST_COUNT, REQUEST_LATENCY
+
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    """Record request count and latency for every HTTP request."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
+        """Time the request, label it by route template, and record metrics."""
+        request.state.request_id = str(uuid.uuid4())
+
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration = time.perf_counter() - start
+
+        # The route template, not request.url.path: labelling by raw path would
+        # create a new time series per distinct URL and blow up cardinality.
+        route = request.scope.get("route")
+        endpoint = getattr(route, "path", request.url.path)
+
+        REQUEST_COUNT.labels(
+            method=request.method, endpoint=endpoint, status=str(response.status_code)
+        ).inc()
+        REQUEST_LATENCY.labels(method=request.method, endpoint=endpoint).observe(duration)
+
+        response.headers["x-request-id"] = request.state.request_id
+        return response
+```
+
+- [ ] **Step 6: Implement `src/sentiment/serving/app.py` with health, ready, and metrics**
 
 ```python
 """The FastAPI application factory."""
 
-import uuid
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -1409,7 +1581,13 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sentiment.config import get_settings
 from sentiment.data.preprocess import DriftReference
 from sentiment.serving.errors import install_error_handlers
-from sentiment.serving.metrics import MODEL_INFO, DriftTracker
+from sentiment.serving.metrics import (
+    MODEL_INFO,
+    MODEL_LAST_RELOAD,
+    MODEL_LOADED,
+    DriftTracker,
+)
+from sentiment.serving.middleware import MetricsMiddleware
 from sentiment.serving.predictor import StubPredictor
 
 # Placeholder reference used while the stub model is in place. Week 2 replaces
@@ -1429,9 +1607,18 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.drift = DriftTracker(
         _BOOTSTRAP_REFERENCE, window_size=settings.drift_window_size
     )
-    MODEL_INFO.labels(version=app.state.predictor.version).set(1)
+    MODEL_LOADED.set(1)
+    MODEL_INFO.info(
+        {
+            "version": app.state.predictor.version,
+            "predictor_class": type(app.state.predictor).__name__,
+            "stage": settings.model_stage,
+        }
+    )
+    MODEL_LAST_RELOAD.set(time.time())
     yield
     app.state.predictor = None
+    MODEL_LOADED.set(0)
 
 
 def create_app() -> FastAPI:
@@ -1442,14 +1629,8 @@ def create_app() -> FastAPI:
         description="Real-time sentiment analysis for e-commerce reviews.",
         lifespan=_lifespan,
     )
+    app.add_middleware(MetricsMiddleware)
     install_error_handlers(app)
-
-    @app.middleware("http")
-    async def _request_id(request: Request, call_next):  # type: ignore[no-untyped-def]
-        request.state.request_id = str(uuid.uuid4())
-        response = await call_next(request)
-        response.headers["x-request-id"] = request.state.request_id
-        return response
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
@@ -1474,15 +1655,15 @@ def create_app() -> FastAPI:
     return app
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [ ] **Step 7: Run the tests to verify they pass**
 
 Run: `pytest tests/integration/test_app_health.py -v --no-cov`
-Expected: 6 passed.
+Expected: 7 passed.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/sentiment/serving/schemas.py src/sentiment/serving/errors.py src/sentiment/serving/app.py tests/integration/test_app_health.py
+git add src/sentiment/serving/ tests/integration/test_app_health.py
 git commit -m "feat: add FastAPI app with health, ready, metrics and typed errors"
 ```
 
@@ -1505,93 +1686,97 @@ git commit -m "feat: add FastAPI app with health, ready, metrics and typed error
 `tests/integration/test_predict.py`:
 
 ```python
-import httpx
 import pytest
-
-from sentiment.serving.app import create_app
-
-
-@pytest.fixture
-async def client():
-    app = create_app()
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        async with app.router.lifespan_context(app):
-            yield c
+from fastapi.testclient import TestClient
 
 
-async def test_predict_returns_the_full_contract(client: httpx.AsyncClient):
-    body = (await client.post("/api/v1/predict", json={"text": "Great product"})).json()
+def test_predict_returns_the_full_contract(client: TestClient):
+    body = client.post("/api/v1/predict", json={"text": "Great product"}).json()
     assert set(body) == {
         "label", "score", "confidence", "model_version", "truncated", "latency_ms"
     }
 
 
-async def test_confidence_is_derived_from_score(client: httpx.AsyncClient):
-    body = (await client.post("/api/v1/predict", json={"text": "Great product"})).json()
+def test_confidence_is_derived_from_score(client: TestClient):
+    body = client.post("/api/v1/predict", json={"text": "Great product"}).json()
     assert body["confidence"] == pytest.approx(max(body["score"], 1 - body["score"]))
 
 
-async def test_blank_text_is_rejected(client: httpx.AsyncClient):
-    response = await client.post("/api/v1/predict", json={"text": "   "})
+def test_blank_text_is_rejected(client: TestClient):
+    response = client.post("/api/v1/predict", json={"text": "   "})
     assert response.status_code == 422
     assert response.json()["error_code"] in {"validation_error", "empty_text"}
 
 
-async def test_missing_field_is_rejected(client: httpx.AsyncClient):
-    assert (await client.post("/api/v1/predict", json={})).status_code == 422
+def test_missing_field_is_rejected(client: TestClient):
+    assert client.post("/api/v1/predict", json={}).status_code == 422
 
 
-async def test_oversized_text_returns_413(client: httpx.AsyncClient):
-    response = await client.post("/api/v1/predict", json={"text": "x" * 100_000})
+def test_oversized_text_returns_413(client: TestClient):
+    response = client.post("/api/v1/predict", json={"text": "x" * 100_000})
     assert response.status_code == 413
     assert response.json()["error_code"] == "text_too_long"
 
 
-async def test_batch_returns_one_result_per_input(client: httpx.AsyncClient):
-    body = (
-        await client.post("/api/v1/predict/batch", json={"texts": ["a", "b", "c"]})
-    ).json()
+def test_batch_returns_one_result_per_input(client: TestClient):
+    body = client.post("/api/v1/predict/batch", json={"texts": ["a", "b", "c"]}).json()
     assert [r["index"] for r in body["results"]] == [0, 1, 2]
     assert all(r["error"] is None for r in body["results"])
 
 
-async def test_batch_isolates_per_item_failures(client: httpx.AsyncClient):
-    body = (
-        await client.post("/api/v1/predict/batch", json={"texts": ["ok", "  "]})
-    ).json()
+def test_batch_isolates_per_item_failures(client: TestClient):
+    body = client.post("/api/v1/predict/batch", json={"texts": ["ok", "  "]}).json()
     assert body["results"][0]["prediction"] is not None
     assert body["results"][1]["error"] is not None
 
 
-async def test_batch_over_the_limit_is_rejected(client: httpx.AsyncClient):
-    response = await client.post(
-        "/api/v1/predict/batch", json={"texts": ["x"] * 65}
-    )
+def test_batch_over_the_limit_is_rejected(client: TestClient):
+    response = client.post("/api/v1/predict/batch", json={"texts": ["x"] * 65})
     assert response.status_code == 413
     assert response.json()["error_code"] == "batch_too_large"
 
 
-async def test_model_info_reports_provenance(client: httpx.AsyncClient):
-    body = (await client.get("/api/v1/model/info")).json()
+def test_model_info_reports_provenance(client: TestClient):
+    body = client.get("/api/v1/model/info").json()
     assert body["model_version"] == "stub-0"
     assert body["predictor_class"] == "StubPredictor"
 
 
-async def test_predictions_are_counted_in_metrics(client: httpx.AsyncClient):
-    await client.post("/api/v1/predict", json={"text": "counted"})
-    text = (await client.get("/metrics")).text
-    assert "sentiment_predictions_total" in text
+def test_predictions_are_counted_by_label(client: TestClient):
+    client.post("/api/v1/predict", json={"text": "counted"})
+    text = client.get("/metrics").text
+    assert "ml_predictions_total" in text
     assert 'model_version="stub-0"' in text
 
 
-async def test_input_length_is_observed(client: httpx.AsyncClient):
-    await client.post("/api/v1/predict", json={"text": "measured"})
-    assert "sentiment_input_length_chars_count" in (await client.get("/metrics")).text
+def test_input_length_is_observed(client: TestClient):
+    client.post("/api/v1/predict", json={"text": "measured"})
+    assert "ml_input_length_chars_count" in client.get("/metrics").text
 
 
-async def test_inference_routes_appear_in_the_openapi_spec(client: httpx.AsyncClient):
-    paths = (await client.get("/openapi.json")).json()["paths"]
+def test_confidence_is_observed(client: TestClient):
+    client.post("/api/v1/predict", json={"text": "measured"})
+    assert "ml_prediction_confidence_count" in client.get("/metrics").text
+
+
+def test_batch_size_is_observed(client: TestClient):
+    client.post("/api/v1/predict/batch", json={"texts": ["a", "b"]})
+    assert "ml_batch_prediction_size_count" in client.get("/metrics").text
+
+
+def test_per_item_failure_is_counted_as_a_prediction_error(client: TestClient):
+    client.post("/api/v1/predict/batch", json={"texts": ["  "]})
+    assert "ml_prediction_errors_total" in client.get("/metrics").text
+
+
+def test_http_metrics_label_by_route_template_not_raw_path(client: TestClient):
+    client.post("/api/v1/predict", json={"text": "labelled"})
+    text = client.get("/metrics").text
+    assert 'endpoint="/api/v1/predict"' in text
+
+
+def test_inference_routes_appear_in_the_openapi_spec(client: TestClient):
+    paths = client.get("/openapi.json").json()["paths"]
     assert {"/api/v1/predict", "/api/v1/predict/batch", "/api/v1/model/info"} <= set(paths)
 ```
 
@@ -1602,22 +1787,25 @@ Expected: FAIL — every prediction call returns 404.
 
 - [ ] **Step 3: Add the router to `create_app` in `src/sentiment/serving/app.py`**
 
-Insert these imports at the top of the module:
+Note there is no HTTP instrumentation here — `MetricsMiddleware` already records
+`http_requests_total` and `http_request_duration_seconds` for every route. Only
+ML metrics belong in this layer, where the prediction is in scope.
+
+Insert these imports at the top of the module (`time` is already imported):
 
 ```python
-import time
-
 from fastapi import APIRouter
 
 from sentiment.serving.errors import APIError
 from sentiment.serving.metrics import (
-    CONFIDENCE,
+    BATCH_SIZE,
     DRIFT_PSI,
-    DURATION,
     INPUT_LENGTH,
     LOW_CONFIDENCE,
-    PREDICTIONS,
-    REQUESTS,
+    PREDICTION_CONFIDENCE,
+    PREDICTION_COUNT,
+    PREDICTION_ERRORS,
+    PREDICTION_LATENCY,
 )
 from sentiment.serving.predictor import Prediction
 from sentiment.serving.schemas import (
@@ -1638,9 +1826,17 @@ Insert this block inside `create_app`, immediately before `return app`:
 
     def _score_one(request: Request, text: str) -> tuple[Prediction, float]:
         """Validate, score, and instrument a single text."""
+        version = request.app.state.predictor.version
+
         if not text.strip():
+            PREDICTION_ERRORS.labels(
+                error_type="empty_text", model_version=version
+            ).inc()
             raise APIError(422, "empty_text", "Text must not be blank.")
         if len(text) > settings.max_text_length:
+            PREDICTION_ERRORS.labels(
+                error_type="text_too_long", model_version=version
+            ).inc()
             raise APIError(
                 413,
                 "text_too_long",
@@ -1651,9 +1847,9 @@ Insert this block inside `create_app`, immediately before `return app`:
         prediction = request.app.state.predictor.predict([text])[0]
         elapsed = time.perf_counter() - started
 
-        version = request.app.state.predictor.version
-        PREDICTIONS.labels(label=prediction.label, model_version=version).inc()
-        CONFIDENCE.observe(prediction.confidence)
+        PREDICTION_LATENCY.labels(model_version=version).observe(elapsed)
+        PREDICTION_COUNT.labels(label=prediction.label, model_version=version).inc()
+        PREDICTION_CONFIDENCE.observe(prediction.confidence)
         INPUT_LENGTH.observe(len(text))
         if prediction.confidence < settings.low_confidence_threshold:
             LOW_CONFIDENCE.inc()
@@ -1677,40 +1873,40 @@ Insert this block inside `create_app`, immediately before `return app`:
     @router.post("/predict", response_model=PredictResponse)
     async def predict(request: Request, payload: PredictRequest) -> PredictResponse:
         """Classify a single review text."""
-        version = request.app.state.predictor.version
-        with DURATION.labels(endpoint="predict").time():
-            prediction, latency_ms = _score_one(request, payload.text)
-        REQUESTS.labels(endpoint="predict", status="200", model_version=version).inc()
+        prediction, latency_ms = _score_one(request, payload.text)
         return _to_response(request, prediction, latency_ms)
 
     @router.post("/predict/batch", response_model=BatchResponse)
     async def predict_batch(request: Request, payload: BatchRequest) -> BatchResponse:
         """Classify several texts, isolating per-item failures."""
+        version = request.app.state.predictor.version
         if len(payload.texts) > settings.max_batch_size:
+            PREDICTION_ERRORS.labels(
+                error_type="batch_too_large", model_version=version
+            ).inc()
             raise APIError(
                 413,
                 "batch_too_large",
                 f"Batch exceeds {settings.max_batch_size} items.",
             )
 
-        version = request.app.state.predictor.version
+        BATCH_SIZE.observe(len(payload.texts))
+
         results: list[BatchItem] = []
-        with DURATION.labels(endpoint="predict_batch").time():
-            for index, text in enumerate(payload.texts):
-                try:
-                    prediction, latency_ms = _score_one(request, text)
-                except APIError as exc:
-                    results.append(BatchItem(index=index, error=exc.message))
-                else:
-                    results.append(
-                        BatchItem(
-                            index=index,
-                            prediction=_to_response(request, prediction, latency_ms),
-                        )
+        for index, text in enumerate(payload.texts):
+            try:
+                prediction, latency_ms = _score_one(request, text)
+            except APIError as exc:
+                # A bad item is not a bad request: record it and carry on, so one
+                # malformed review cannot fail the other sixty-three.
+                results.append(BatchItem(index=index, error=exc.message))
+            else:
+                results.append(
+                    BatchItem(
+                        index=index,
+                        prediction=_to_response(request, prediction, latency_ms),
                     )
-        REQUESTS.labels(
-            endpoint="predict_batch", status="200", model_version=version
-        ).inc()
+                )
         return BatchResponse(results=results)
 
     @router.get("/model/info", response_model=ModelInfo)
@@ -1728,7 +1924,7 @@ Insert this block inside `create_app`, immediately before `return app`:
 
 - [ ] **Step 4: Run the full test suite to verify it passes**
 
-Run: `pytest tests/ -v --no-cov && ruff check src tests && mypy`
+Run: `pytest tests/ -v --no-cov && make lint && make typecheck`
 Expected: all tests pass, including the previously-xfailed OpenAPI assertion in
 Task 7 (remove the `xfail` marker if you added one).
 
@@ -1749,7 +1945,7 @@ git commit -m "feat: add predict, batch and model-info endpoints with metrics"
 ### Task 9: Multi-stage container image
 
 **Files:**
-- Create: `docker/api.Dockerfile`, `.dockerignore`
+- Create: `Dockerfile`, `.dockerignore`
 - Test: manual build and run (verified again by the Compose smoke test in Task 10)
 
 **Interfaces:**
@@ -1773,11 +1969,11 @@ tests
 .env
 .pytest_cache
 .mypy_cache
-.ruff_cache
+.mypy_cache
 htmlcov
 ```
 
-- [ ] **Step 2: Create `docker/api.Dockerfile`**
+- [ ] **Step 2: Create `Dockerfile`**
 
 ```dockerfile
 # ---- builder -----------------------------------------------------------
@@ -1822,7 +2018,7 @@ CMD ["uvicorn", "sentiment.serving.app:create_app", "--factory", \
 
 - [ ] **Step 3: Build the image**
 
-Run: `docker build -f docker/api.Dockerfile -t sentiment-api:dev .`
+Run: `docker build -t sentiment-api:dev .`
 Expected: build succeeds.
 
 - [ ] **Step 4: Verify it runs, is healthy, and is non-root**
@@ -1842,7 +2038,7 @@ health status is `healthy`, and `id -u` prints `1000`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add docker/api.Dockerfile .dockerignore
+git add Dockerfile .dockerignore
 git commit -m "feat: add multi-stage non-root API image"
 ```
 
@@ -1852,16 +2048,16 @@ git commit -m "feat: add multi-stage non-root API image"
 
 **Files:**
 - Create: `docker-compose.yml`
-- Create: `monitoring/prometheus/prometheus.yml`, `monitoring/prometheus/alerts.yml`
-- Create: `monitoring/alertmanager/alertmanager.yml`
-- Create: `monitoring/grafana/provisioning/datasources/prometheus.yml`
-- Create: `monitoring/grafana/provisioning/dashboards/dashboards.yml`
+- Create: `prometheus/prometheus.yml`, `prometheus/alerts/api_alerts.yml`, `prometheus/alerts/ml_alerts.yml`
+- Create: `alertmanager/alertmanager.yml`
+- Create: `grafana/provisioning/datasources/prometheus.yml`
+- Create: `grafana/provisioning/dashboards/dashboards.yml`
 - Test: `tests/integration/test_stack_smoke.py`
 
 **Interfaces:**
 - Consumes: the API image from Task 9, the metric names from Task 6.
 - Produces: a six-service stack. Week 3 adds dashboard JSON under
-  `monitoring/grafana/dashboards/`, which the provisioning file already points at.
+  `grafana/dashboards/`, which the provisioning file already points at.
 
 - [ ] **Step 1: Create `docker-compose.yml`**
 
@@ -1872,7 +2068,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/api.Dockerfile
+      dockerfile: Dockerfile
     ports: ["8000:8000"]
     environment:
       SENTIMENT_MLFLOW_TRACKING_URI: http://mlflow:5000
@@ -1923,7 +2119,7 @@ services:
     image: prom/prometheus:v3.0.1
     ports: ["9090:9090"]
     volumes:
-      - ./monitoring/prometheus:/etc/prometheus:ro
+      - ./prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -1940,7 +2136,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     ports: ["9093:9093"]
-    volumes: ["./monitoring/alertmanager:/etc/alertmanager:ro"]
+    volumes: ["./alertmanager:/etc/alertmanager:ro"]
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
@@ -1956,8 +2152,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     depends_on:
       prometheus: {condition: service_healthy}
@@ -1977,7 +2173,7 @@ volumes:
 
 - [ ] **Step 2: Create the Prometheus configuration and alert rules**
 
-`monitoring/prometheus/prometheus.yml`:
+`prometheus/prometheus.yml`:
 
 ```yaml
 global:
@@ -1985,7 +2181,7 @@ global:
   evaluation_interval: 15s
 
 rule_files:
-  - /etc/prometheus/alerts.yml
+  - /etc/prometheus/alerts/*.yml
 
 alerting:
   alertmanagers:
@@ -2003,11 +2199,14 @@ scrape_configs:
       - targets: ["localhost:9090"]
 ```
 
-`monitoring/prometheus/alerts.yml`:
+Alerts are split by concern into two files, as in Lab 4. Week 3 adds a third,
+`fairness_alerts.yml`, which the `alerts/*.yml` glob already picks up.
+
+`prometheus/alerts/api_alerts.yml`:
 
 ```yaml
 groups:
-  - name: sentiment-service
+  - name: api_alerts
     rules:
       - alert: APIDown
         expr: up{job="sentiment-api"} == 0
@@ -2015,54 +2214,96 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: "Sentiment API is not being scraped"
+          description: "Prometheus cannot reach the API target."
           runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#apidown"
 
       - alert: HighErrorRate
         expr: |
-          sum(rate(sentiment_requests_total{status=~"5.."}[5m]))
-            / clamp_min(sum(rate(sentiment_requests_total[5m])), 0.001) > 0.05
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total[5m])), 0.001) > 0.05
         for: 5m
         labels: {severity: critical}
         annotations:
           summary: "5xx rate above 5% for 5 minutes"
+          description: "{{ $value | humanizePercentage }} of requests are failing."
           runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#higherrorrate"
 
       - alert: HighLatencyP95
         expr: |
           histogram_quantile(
-            0.95, sum(rate(sentiment_request_duration_seconds_bucket[5m])) by (le)
+            0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
           ) > 0.5
         for: 5m
         labels: {severity: warning}
         annotations:
           summary: "p95 latency above 500ms (2.5x the 200ms SLO)"
+          description: "P95 latency is {{ $value }}s."
           runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#highlatencyp95"
+```
+
+`prometheus/alerts/ml_alerts.yml` — the first, fourth, and fifth rules are Lab 4's,
+reused unchanged because the metric names match:
+
+```yaml
+groups:
+  - name: ml_alerts
+    rules:
+      - alert: ModelNotLoaded
+        expr: ml_model_loaded == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "ML model not loaded"
+          description: "The API is up but no model is loaded; predictions return 503."
+          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#modelnotloaded"
 
       - alert: PredictionSkew
         expr: |
           abs(
-            sum(rate(sentiment_predictions_total{label="positive"}[15m]))
-              / clamp_min(sum(rate(sentiment_predictions_total[15m])), 0.001)
+            sum(rate(ml_predictions_total{label="positive"}[15m]))
+              / clamp_min(sum(rate(ml_predictions_total[15m])), 0.001)
             - 0.5
           ) > 0.2
         for: 15m
         labels: {severity: warning}
         annotations:
           summary: "Positive-class rate deviates more than 20pp from the training prior"
+          description: "Positive share has drifted to {{ $value | humanizePercentage }} away from 0.5."
           runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#predictionskew"
 
       - alert: DriftDetected
-        expr: sentiment_drift_psi > 0.2
+        expr: ml_drift_psi > 0.2
         for: 10m
         labels: {severity: warning}
         annotations:
           summary: "Input length PSI above 0.2 (conventional significant-shift boundary)"
+          description: "PSI is {{ $value }} against the training reference."
           runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#driftdetected"
+
+      - alert: HighPredictionErrorRate
+        expr: |
+          rate(ml_prediction_errors_total[5m])
+            / clamp_min(rate(ml_predictions_total[5m]), 0.000001) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "High prediction error rate"
+          description: "{{ $value | humanizePercentage }} of predictions are failing."
+          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#highpredictionerrorrate"
+
+      - alert: ModelStale
+        expr: time() - ml_model_last_reload_timestamp > 604800
+        for: 1h
+        labels: {severity: info}
+        annotations:
+          summary: "ML model may be stale"
+          description: "Model has not been reloaded in {{ $value | humanizeDuration }}."
+          runbook_url: "https://github.com/OWNER/sentiment-service/blob/main/docs/user-guide.md#modelstale"
 ```
 
 - [ ] **Step 3: Create the Alertmanager and Grafana provisioning files**
 
-`monitoring/alertmanager/alertmanager.yml`:
+`alertmanager/alertmanager.yml`:
 
 ```yaml
 route:
@@ -2076,7 +2317,7 @@ receivers:
   - name: default
 ```
 
-`monitoring/grafana/provisioning/datasources/prometheus.yml`:
+`grafana/provisioning/datasources/prometheus.yml`:
 
 ```yaml
 apiVersion: 1
@@ -2088,7 +2329,7 @@ datasources:
     isDefault: true
 ```
 
-`monitoring/grafana/provisioning/dashboards/dashboards.yml`:
+`grafana/provisioning/dashboards/dashboards.yml`:
 
 ```yaml
 apiVersion: 1
@@ -2106,7 +2347,7 @@ providers:
 Create the dashboard directory so the mount resolves before Week 3 fills it:
 
 ```bash
-mkdir -p monitoring/grafana/dashboards && touch monitoring/grafana/dashboards/.gitkeep
+mkdir -p grafana/dashboards && touch grafana/dashboards/.gitkeep
 ```
 
 - [ ] **Step 4: Write the smoke test**
@@ -2203,59 +2444,167 @@ git commit -m "feat: add six-service compose stack with prometheus alerts"
 
 - [ ] **Step 1: Create `.github/workflows/ci.yml`**
 
+The pipeline shape is Lab 3's, kept deliberately: cheap checks gate expensive
+ones, and a single aggregate `ci-status` job is what branch protection requires.
+
 ```yaml
-name: ci
+# =============================================================================
+# CI Pipeline for Sentiment Service
+# DDM501 - Final Project
+#
+#   lint ─┐
+#         ├─> test (3.10, 3.11) ─> container (build, scan, smoke) ─> ci-status
+#   type ─┘
+#
+# Lint and type checks finish in seconds and stop a bad commit before anyone
+# pays for a Docker build.
+# =============================================================================
+
+name: CI Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHON_DEFAULT: "3.10"
+
 jobs:
-  quality:
-    name: lint, types, tests
+  lint:
+    name: Lint Code
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_DEFAULT }}
           cache: pip
+          cache-dependency-path: requirements-dev.txt
 
-      - name: Install
-        run: pip install -e ".[dev]"
-
-      - name: Lint
+      - name: Install linters
+        # Pinned to the same versions as requirements-dev.txt: an unpinned
+        # release can turn the build red with no code change.
         run: |
-          ruff check src tests
-          ruff format --check src tests
+          python -m pip install --upgrade pip
+          pip install flake8==7.0.0 black==23.12.1 isort==5.13.2
 
-      - name: Type check
-        run: mypy
+      - name: Run flake8
+        run: flake8 src/ tests/ scripts/
 
-      - name: Test with coverage gate
-        run: pytest -m "not slow and not integration"
+      - name: Check black formatting
+        run: black --check --diff src/ tests/ scripts/
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.xml
+      - name: Check import sorting
+        run: isort --check-only --diff src/ tests/ scripts/
 
-  container:
-    name: build, scan, smoke
+  type-check:
+    name: Type Check
     runs-on: ubuntu-latest
-    needs: quality
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+
+      - name: Install dependencies
+        # Derived from requirements.txt rather than hand-listed, so a new
+        # runtime dependency can never be missing here.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install mypy==1.8.0 types-requests pandas-stubs==2.3.3.260113
+          pip install -e .
+
+      - name: Run mypy
+        run: mypy src/ scripts/ --ignore-missing-imports
+
+  test:
+    name: Run Tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: [lint, type-check]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            -m "not slow and not integration" \
+            --cov=sentiment \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=80 \
+            --junitxml=junit.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-py${{ matrix.python-version }}
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: junit.xml
+          retention-days: 14
+
+  container:
+    name: Build, Scan, Smoke
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build API image
-        run: docker build -f docker/api.Dockerfile -t sentiment-api:ci .
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: sentiment-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Scan image
         uses: aquasecurity/trivy-action@0.28.0
@@ -2266,18 +2615,16 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
       - name: Start the stack
         run: |
           cp .env.example .env
           docker compose up -d --build
 
       - name: Wait for the API to become ready
+        # /ready, not /health: a container that is up but serving 503 because no
+        # model loaded is still a broken release.
         run: |
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl -fsS http://localhost:8000/ready; then exit 0; fi
             sleep 5
           done
@@ -2292,6 +2639,21 @@ jobs:
       - name: Dump logs on failure
         if: failure()
         run: docker compose logs
+
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, test, container]
+    if: always()
+    steps:
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more CI jobs failed."
+          exit 1
+
+      - name: Report success
+        run: echo "All CI checks passed."
 ```
 
 - [ ] **Step 2: Verify the workflow parses**
@@ -2318,6 +2680,7 @@ a broken CI on day five is a broken CI on day twenty-five.
 **Files:**
 - Create: `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`
 - Create: `docs/user-guide.md` (alert runbook stubs referenced by `runbook_url`)
+- Create: `docs/TESTING_STRATEGY.md` (the four test types and what each is for, as in Lab 3)
 
 **Interfaces:**
 - Consumes: the spec at `docs/superpowers/specs/2026-08-09-sentiment-service-design.md`.
@@ -2355,26 +2718,33 @@ rule that every member reviews at least one PR per week outside their own area.
 
 One `##` section per alert, with an anchor exactly matching the `runbook_url`
 fragments from Task 10: `#apidown`, `#higherrorrate`, `#highlatencyp95`,
-`#predictionskew`, `#driftdetected`. Each section states what fired, the likely
-causes, and the first three diagnostic commands to run. Also cover deploying the
-stack, reading each dashboard, and rolling back to a previous model version.
+`#modelnotloaded`, `#predictionskew`, `#driftdetected`,
+`#highpredictionerrorrate`, `#modelstale`. Each section states what fired, the
+likely causes, and the first three diagnostic commands to run. Also cover
+deploying the stack, reading each dashboard, and rolling back to a previous
+model version.
 
 - [ ] **Step 5: Verify every runbook link resolves**
 
+A runbook link that 404s at 3am is worse than no link, so this is checked
+mechanically rather than by eye.
+
 ```bash
-grep -o 'user-guide.md#[a-z]*' monitoring/prometheus/alerts.yml | sort -u | \
-  sed 's/.*#//' | while read -r anchor; do
-    grep -qi "^## .*" docs/user-guide.md && \
-    grep -qi "$anchor" <(grep '^## ' docs/user-guide.md | tr 'A-Z ' 'a-z-') \
-      && echo "ok: $anchor" || echo "MISSING: $anchor"
+grep -ho 'user-guide.md#[a-z]*' prometheus/alerts/*.yml | sed 's/.*#//' | sort -u | \
+  while read -r anchor; do
+    if grep '^## ' docs/user-guide.md | tr 'A-Z ' 'a-z-' | grep -q "$anchor"; then
+      echo "ok: $anchor"
+    else
+      echo "MISSING: $anchor"
+    fi
   done
 ```
 
-Expected: `ok:` for all five anchors. Fix any `MISSING:` before committing.
+Expected: `ok:` for all eight anchors. Fix any `MISSING:` before committing.
 
 - [ ] **Step 6: Replace the `OWNER` placeholder in the alert runbook URLs**
 
-Run: `grep -rn 'github.com/OWNER' monitoring/`
+Run: `grep -rn 'github.com/OWNER' prometheus/`
 Expected: no results after you substitute your real GitHub org/user. This is the
 one intentional placeholder in the plan and it must not survive Task 12.
 
@@ -2391,10 +2761,11 @@ git commit -m "docs: add README, architecture, contributing and runbooks"
 
 - [ ] `docker compose down -v && docker compose up -d --build` yields six healthy services from scratch.
 - [ ] `curl -X POST localhost:8000/api/v1/predict -H 'content-type: application/json' -d '{"text":"great"}'` returns a full prediction.
-- [ ] Prometheus shows `up{job="sentiment-api"} == 1` and all five alert rules loaded.
+- [ ] Prometheus shows `up{job="sentiment-api"} == 1` and all eight alert rules loaded.
+- [ ] `/metrics` exposes both `http_*` and `ml_*` families — Lab 4's dashboards depend on these exact names.
 - [ ] Grafana is reachable with the Prometheus datasource already provisioned.
 - [ ] `pytest -m "not slow"` passes with coverage ≥ 80%.
-- [ ] `ruff check`, `ruff format --check`, and `mypy` are all clean.
+- [ ] `make lint` (flake8 + black + isort) and `make typecheck` (mypy) are clean.
 - [ ] CI is green on `main`.
 - [ ] `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `.github/workflows/` all exist — the brief's required-files list.
 - [ ] Every team member has at least one commit.

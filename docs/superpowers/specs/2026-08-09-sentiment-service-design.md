@@ -208,6 +208,9 @@ emoji input → preserved through tokenisation, covered by a unit test.
 | Fairness benchmark | Equity Evaluation Corpus | Demographic groupby, Fairlearn on tabular attrs | Review datasets carry no demographic columns, so group-wise metrics are impossible. EEC probes the *model* with minimally-different sentence pairs, which is the established method for this exact task (Kiritchenko & Mohammad, 2018). |
 | Explainability | SHAP (global) + LIME (local) | Attention weights, Integrated Gradients | The rubric's "Excellent" asks for multiple methods. Attention weights are contested as explanations; SHAP and LIME are defensible. |
 | Orchestration | Docker Compose | Kubernetes, plain Docker | Required by the brief; Compose profiles let training and serving live in one file without a second orchestrator. |
+| Lint & format | flake8 + black + isort, all pinned | ruff | ruff is faster and would replace all three, but the course taught this toolchain, Lab 3's CI already runs it, and pinned versions mean a new release cannot turn the build red without a code change. Consistency with the graded labs outweighs the speed. |
+| Repo layout | `src/` package + root `prometheus/`, `grafana/`, `scripts/`, `models/` | flat `app/` as in Labs 1-4 | `src/` layout matches the `stock-signal-mlops` assignment and prevents accidental imports from the working directory; the root monitoring and script directories match Lab 4 so its dashboards and Compose mounts port over unmodified. |
+| Python version | `>=3.10`, CI matrix 3.10 and 3.11 | pin 3.11 exactly | Matches Lab 3. Testing both versions catches version-dependent behaviour that a single pin hides. |
 
 **Scalability.** Single-replica CPU inference is the target. Horizontal scaling would work
 (the API is stateless apart from the in-memory drift window, which would need moving to a
@@ -224,20 +227,25 @@ scheduler were designed and rejected for this timeline (§9).
 
 ### 3.1 Repository layout
 
+The layout follows the conventions established across DDM501 Labs 1-4 and the
+`stock-signal-mlops` assignment, so that lab code, Grafana dashboards, and the
+Lab 3 CI pipeline can be reused rather than reinvented. Deviations from the labs
+are noted inline.
+
 ```
 sentiment-service/
 ├── README.md                    project overview, badges, quickstart, troubleshooting
 ├── ARCHITECTURE.md              system design (derived from §2 of this spec)
 ├── CONTRIBUTING.md              team roles, branching, commit conventions
-├── pyproject.toml               deps, ruff, mypy, pytest, coverage config
-├── requirements.txt             pinned, generated from pyproject
-├── .gitignore  .env.example  Makefile
+├── pyproject.toml               black, isort, mypy, pytest, coverage config (Lab 3)
+├── requirements.txt             runtime dependencies, pinned
+├── requirements-dev.txt         test and lint dependencies, pinned (Lab 3)
+├── .flake8  .pre-commit-config.yaml            (Lab 3)
+├── .gitignore  .dockerignore  .env.example  Makefile
+├── Dockerfile                   at root, as in every lab
 ├── docker-compose.yml
-├── docker/
-│   ├── api.Dockerfile           multi-stage, non-root, HEALTHCHECK
-│   └── training.Dockerfile
-├── src/sentiment/
-│   ├── config.py                pydantic-settings, 12-factor
+├── src/sentiment/               src-layout, as in stock-signal-mlops
+│   ├── config.py                settings
 │   ├── data/
 │   │   ├── ingest.py            HF download → raw parquet
 │   │   ├── validate.py          quality gate
@@ -247,11 +255,12 @@ sentiment-service/
 │   │   ├── transformer.py       DistilBERT fine-tune
 │   │   └── registry.py          MLflow load / promote
 │   ├── training/
-│   │   ├── train.py             CLI entrypoint
+│   │   ├── train.py             pipeline entrypoint
 │   │   ├── tune.py              Optuna, nested MLflow runs
 │   │   └── evaluate.py          metrics, plots, promotion gate
 │   ├── serving/
 │   │   ├── app.py               FastAPI app + lifespan
+│   │   ├── middleware.py        MetricsMiddleware (Lab 4 pattern)
 │   │   ├── schemas.py           pydantic v2 with examples
 │   │   ├── predictor.py         model wrapper
 │   │   ├── metrics.py           Prometheus collectors
@@ -260,18 +269,32 @@ sentiment-service/
 │       ├── fairness.py          EEC probe over HTTP
 │       ├── explain.py           SHAP + LIME
 │       └── report.py            markdown/HTML report generation
-├── tests/
-│   ├── unit/  integration/  data_quality/  model/
-├── monitoring/
-│   ├── prometheus/prometheus.yml
-│   ├── prometheus/alerts.yml
-│   ├── alertmanager/alertmanager.yml
-│   └── grafana/provisioning/{datasources,dashboards}/ + dashboards/*.json
+├── scripts/                     operational entrypoints, as in the labs
+│   ├── train_model.py  validate_model.py
+│   ├── run_fairness_probe.py  load_test.py
+├── tests/                       conftest.py + package dirs, as in Lab 3
+│   ├── conftest.py
+│   └── unit/  integration/  data/  model/
+├── prometheus/                  at root, as in Lab 4
+│   ├── prometheus.yml
+│   └── alerts/  api_alerts.yml  ml_alerts.yml  fairness_alerts.yml
+├── alertmanager/alertmanager.yml               (new; Lab 4 had no alertmanager)
+├── grafana/                     at root, as in Lab 4
+│   ├── provisioning/{datasources,dashboards}/
+│   └── dashboards/*.json
+├── models/                      local model artifacts, gitignored
+├── data/{raw,processed}/        gitignored
+├── notebooks/                   EDA only, excluded from coverage
 ├── docs/
-│   ├── api.md  user-guide.md
-│   └── superpowers/specs/
+│   ├── api.md  user-guide.md  TESTING_STRATEGY.md
+│   └── superpowers/{specs,plans}/
 └── .github/workflows/  ci.yml  cd.yml
 ```
+
+**Naming note.** `src/sentiment/models/` is the Python package for model *code*;
+the root `models/` directory holds serialised model *artifacts*, matching the
+labs. They are never confused in practice because one is only ever imported and
+the other only ever read from disk.
 
 ### 3.2 ML pipeline
 
@@ -331,16 +354,44 @@ serving stack while `docker compose --profile training up` runs ingest → train
 
 ### 3.5 Monitoring
 
+Metric names follow the `http_*` / `ml_*` convention taught in Lab 4. This is a
+deliberate reuse decision, not cosmetic: Lab 4 ships working
+`system_dashboard.json` and `ml_dashboard.json` Grafana dashboards, and keeping
+the names means those import and light up immediately instead of being rebuilt
+panel by panel.
+
+Inherited from Lab 4 unchanged:
+
 ```
-sentiment_requests_total{endpoint,status,model_version}   counter
-sentiment_request_duration_seconds{endpoint}              histogram
-sentiment_predictions_total{label,model_version}          counter
-sentiment_confidence                                      histogram
-sentiment_low_confidence_total                            counter
-sentiment_input_length_chars                              histogram
-sentiment_drift_psi                                       gauge
-sentiment_model_info{version,f1,fairness_delta}           gauge
+http_requests_total{method,endpoint,status}               counter
+http_request_duration_seconds{method,endpoint}            histogram
+ml_predictions_total{label,model_version}                 counter
+ml_prediction_duration_seconds{model_version}             histogram
+ml_prediction_errors_total{error_type,model_version}      counter
+ml_model_loaded                                           gauge
+ml_model_info                                             info
+ml_model_last_reload_timestamp                            gauge
+ml_batch_prediction_size                                  histogram
 ```
+
+Added for this project — these are the "custom metrics" the rubric's top band
+asks for, and each exists because a specific alert or dashboard panel needs it:
+
+```
+ml_prediction_confidence                                  histogram
+ml_low_confidence_total                                   counter
+ml_input_length_chars                                     histogram
+ml_drift_psi                                              gauge
+ml_fairness_max_delta                                     gauge
+```
+
+`ml_predictions_total` gains a `label` dimension that Lab 4 did not have,
+because prediction skew between the two sentiment classes is a signal here
+whereas Lab 4 predicted a continuous rating.
+
+HTTP metrics are recorded by a `MetricsMiddleware` (the Lab 4 pattern) rather
+than per-endpoint, so coverage cannot drift as endpoints are added. ML metrics
+are recorded inside the prediction path, where the prediction is in scope.
 
 Three Grafana dashboards, provisioned from files in the repo so they survive
 `docker compose down -v` and are reviewable in a pull request:
@@ -351,17 +402,22 @@ Three Grafana dashboards, provisioned from files in the repo so they survive
 3. **Fairness & Explainability** — latest EEC deltas per identity group, promotion-gate
    status.
 
-Alert rules, each carrying a `runbook_url` annotation pointing at a section of
-`docs/user-guide.md`:
+Alert rules are split across three files under `prometheus/alerts/`, following
+Lab 4's separation of `api_alerts.yml` from `ml_alerts.yml`, with a third file
+added for this project. Each rule carries a `runbook_url` annotation pointing at
+a section of `docs/user-guide.md`:
 
-| Alert | Condition | Threshold rationale |
-|---|---|---|
-| `APIDown` | `up == 0` for 1m | Immediate. |
-| `HighErrorRate` | 5xx ratio > 5% for 5m | Above expected client-error noise. |
-| `HighLatencyP95` | p95 > 500 ms for 5m | 2.5× the 200 ms SLO, avoids flapping. |
-| `PredictionSkew` | positive rate deviates > 20 pp from training prior for 15m | Wide enough to tolerate genuine traffic variation. |
-| `DriftDetected` | `sentiment_drift_psi > 0.2` for 10m | Conventional PSI "significant shift" boundary. |
-| `ModelNotReady` | `/ready` failing for 2m | Distinguishes a bad deploy from a crash. |
+| File | Alert | Condition | Threshold rationale |
+|---|---|---|---|
+| api | `APIDown` | `up == 0` for 1m | Immediate. |
+| api | `HighErrorRate` | 5xx ratio over `http_requests_total` > 5% for 5m | Above expected client-error noise. |
+| api | `HighLatencyP95` | p95 of `http_request_duration_seconds` > 500 ms for 5m | 2.5× the 200 ms SLO, avoids flapping. |
+| ml | `ModelNotLoaded` | `ml_model_loaded == 0` for 1m | Lab 4 rule, reused verbatim. |
+| ml | `PredictionSkew` | positive share of `ml_predictions_total` deviates > 20 pp from the training prior for 15m | Wide enough to tolerate genuine traffic variation. |
+| ml | `DriftDetected` | `ml_drift_psi > 0.2` for 10m | Conventional PSI "significant shift" boundary. |
+| ml | `HighPredictionErrorRate` | `ml_prediction_errors_total` / `ml_predictions_total` > 5% for 5m | Lab 4 rule, reused verbatim. |
+| ml | `ModelStale` | `time() - ml_model_last_reload_timestamp > 7d` | Lab 4 rule, reused verbatim. |
+| fairness | `FairnessRegression` | `ml_fairness_max_delta > 0.05` for 15m | The same threshold as the promotion gate (§1.5), so the running system is held to the promotion standard. |
 
 ---
 
@@ -371,10 +427,13 @@ Alert rules, each carrying a `runbook_url` annotation pointing at a section of
 
 - **unit** (`tests/unit/`) — preprocessing, feature extraction, PSI computation, schema
   validation, error mapping.
-- **integration** (`tests/integration/`) — every endpoint via `httpx.AsyncClient` against
-  the real ASGI app; plus a Compose smoke test that brings the stack up and asserts
-  `/ready`, a prediction, and that Prometheus has scraped a sample.
-- **data_quality** (`tests/data_quality/`) — the validation gate's rules, exercised against
+- **integration** (`tests/integration/`) — every endpoint via
+  `fastapi.testclient.TestClient` against the real ASGI app, following Lab 3's
+  `conftest.py`: the client is used as a context manager so the lifespan actually
+  runs and the model global is populated. Plus a Compose smoke test that brings
+  the stack up and asserts `/ready`, a prediction, and that Prometheus has
+  scraped a sample.
+- **data_quality** (`tests/data/`, named as in Lab 3) — the validation gate's rules, exercised against
   both fixtures and real data: schema conformance, null/empty text, label balance,
   duplicate rate, length outliers, encoding.
 - **model** (`tests/model/`) — behavioural rather than metric-threshold tests: known-positive
@@ -390,10 +449,24 @@ excluded.
 
 ### 4.3 Pipelines
 
-`ci.yml`, on push and pull request: ruff (lint + format check) → mypy → pytest with coverage
-→ upload coverage report → build the API image → Trivy scan → Compose smoke test.
-Transformer-training tests are marked `@pytest.mark.slow` and excluded from this path, so PR
-feedback stays under roughly three minutes; they run on a nightly schedule.
+`ci.yml` reuses the Lab 3 pipeline shape, which is already proven on this course's
+toolchain:
+
+```
+lint ─┐
+      ├─> test (3.10, 3.11) ─> model-validation ─> build ─> ci-status
+type ─┘
+```
+
+Fast, cheap checks gate the slow ones. `lint` runs flake8, `black --check`, and
+`isort --check-only`; `type-check` runs mypy; `test` runs pytest with
+`--cov-fail-under=80` across a 3.10/3.11 matrix; `build` builds the image, scans
+it with Trivy, and smoke-tests the Compose stack. `ci-status` aggregates all
+jobs into a single required check for branch protection — the Lab 3 pattern.
+
+Transformer-training tests are marked `@pytest.mark.slow` and excluded from the
+PR path so feedback stays under roughly three minutes; they run on a nightly
+schedule.
 
 `cd.yml`, on tag: rebuild and push the image to GHCR with the tag and `latest`.
 
@@ -476,11 +549,11 @@ format, mypy in CI.
 
 | | Owner | Primary directories |
 |---|---|---|
-| M1 | Data & Features | `src/sentiment/data/`, `tests/data_quality/` |
-| M2 | Training & Experiments | `src/sentiment/models/`, `src/sentiment/training/`, `tests/model/` |
-| M3 | Serving & Containers | `src/sentiment/serving/`, `docker/`, `docker-compose.yml` |
-| M4 | Monitoring & CI/CD | `monitoring/`, `.github/workflows/`, `tests/integration/` |
-| M5 | Responsible AI & Docs | `src/sentiment/responsible/`, `docs/`, `README.md`, `ARCHITECTURE.md` |
+| M1 | Data & Features | `src/sentiment/data/`, `tests/data/` |
+| M2 | Training & Experiments | `src/sentiment/models/`, `src/sentiment/training/`, `scripts/train_model.py`, `scripts/validate_model.py`, `tests/model/` |
+| M3 | Serving & Containers | `src/sentiment/serving/`, `Dockerfile`, `docker-compose.yml` |
+| M4 | Monitoring & CI/CD | `prometheus/`, `grafana/`, `alertmanager/`, `scripts/load_test.py`, `.github/workflows/`, `tests/integration/` |
+| M5 | Responsible AI & Docs | `src/sentiment/responsible/`, `scripts/run_fairness_probe.py`, `docs/`, `README.md`, `ARCHITECTURE.md` |
 
 Ownership is by directory and is disjoint, so the git history demonstrates individual
 contribution without anyone having to argue for it during the ±20% adjustment. Every member
