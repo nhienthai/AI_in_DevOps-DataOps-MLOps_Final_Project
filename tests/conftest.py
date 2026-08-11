@@ -1,4 +1,15 @@
-"""Shared pytest fixtures for all tests.
+"""Shared pytest fixtures."""
 
-Not yet implemented. See: Week 1, Task 1 of docs/superpowers/plans/2026-08-09-walking-skeleton.md
-"""
+from collections.abc import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+
+from sentiment.serving.app import create_app
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """Yield a client whose context runs the application lifespan."""
+    with TestClient(create_app()) as test_client:
+        yield test_client
