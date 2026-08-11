@@ -19,7 +19,6 @@ from transformers import (
 
 from src.sentiment.config import settings
 from src.sentiment.models.baseline import BaselinePredictor
-from src.sentiment.models.transformer import TransformerPredictor
 from src.sentiment.training.evaluate import compute_metrics, evaluate_predictions
 
 logging.basicConfig(level=logging.INFO)
@@ -95,6 +94,7 @@ def train_transformer_model(
         model_name, num_labels=settings.num_labels
     )
 
+    use_fp16 = torch.cuda.is_available()
     training_args = TrainingArguments(
         output_dir=output_dir,
         eval_strategy="epoch",
@@ -108,7 +108,9 @@ def train_transformer_model(
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=50,
-        report_to=["mlflow"],
+        fp16=use_fp16,
+        report_to=[],  # We manage MLflow manually via mlflow.start_run()
+        dataloader_num_workers=2,
     )
 
     with mlflow.start_run(run_name=f"fine-tune-{model_name.replace('/', '-')}"):
