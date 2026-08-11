@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """CLI script to trigger baseline or XLM-RoBERTa model training."""
 
-import argparse
-import sys
+# ⚠️ MUST be set before any mlflow import — works for MLflow 3.x on Kaggle
 import os
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
-import mlflow
+os.environ.setdefault("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+
+import argparse
+import sys
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import mlflow
 from src.sentiment.config import settings
 from src.sentiment.training.train import train_baseline_model, train_transformer_model
 

@@ -1,6 +1,10 @@
 """Training pipeline for baseline and XLM-RoBERTa transformer models with MLflow logging."""
 
 import os
+# ⚠️ MUST be set before mlflow import for MLflow 3.x compatibility
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+os.environ.setdefault("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+
 import logging
 from typing import Any, Dict, Optional
 import mlflow
