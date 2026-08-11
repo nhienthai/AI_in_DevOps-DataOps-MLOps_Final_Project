@@ -4,43 +4,33 @@ Hướng dẫn chạy huấn luyện mô hình **XLM-RoBERTa** trên bộ dữ l
 
 ---
 
-### Bước 1: Mở Notebook mới trên Kaggle
-1. Đăng nhập vào [Kaggle](https://www.kaggle.com).
-2. Tạo Notebook mới (New Notebook).
-3. Chọn **Accelerator**: `GPU T4 x2` hoặc `GPU P100` trong mục *Notebook options*.
+### 📌 LƯU Ý KHI CHẠY TRÊN KAGGLE NOTEBOOK
+Mỗi bước bên dưới nên được chạy trong **từng Cell riêng biệt** để Kaggle Notebook nhận diện chính xác đường dẫn làm việc (`%cd`).
 
 ---
 
-### Bước 2: Clone Git Repo và Cài đặt môi trường
-Trong cell đầu tiên của Kaggle Notebook, chạy lệnh sau:
+### Cell 1: Clone Repository & Di chuyển vào thư mục dự án
 
-```bash
-# 1. Clone repository
+```python
+import os
 !git clone -b model/sentiment-training-setup https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project.git
-%cd AI_in_DevOps-DataOps-MLOps_Final_Project
+%cd /kaggle/working/AI_in_DevOps-DataOps-MLOps_Final_Project
+!pwd
+```
 
-# 2. Cài đặt các thư viện cần thiết
+---
+
+### Cell 2: Cài đặt Thư viện
+
+```python
 !pip install -q -r requirements.txt
 ```
 
 ---
 
-### Bước 3: Huấn luyện Baseline Model (TF-IDF + Logistic Regression)
-Chạy thử nghiệm baseline nhanh để kiểm tra dữ liệu và lưu log MLflow:
+### Cell 3: Fine-tune XLM-RoBERTa trên GPU Kaggle
 
-```bash
-!python scripts/train_model.py \
-    --model-type baseline \
-    --dataset tridm/UIT-VSFC \
-    --output-dir ./artifacts
-```
-
----
-
-### Bước 4: Fine-tune mô hình XLM-RoBERTa trên GPU Kaggle
-Chạy huấn luyện mô hình Transformer chính thức:
-
-```bash
+```python
 !python scripts/train_model.py \
     --model-type transformer \
     --model-name xlm-roberta-base \
@@ -53,14 +43,11 @@ Chạy huấn luyện mô hình Transformer chính thức:
 
 ---
 
-### Bước 5: Kiểm tra Quality Gate & Lưu Weights
-Kiểm tra xem mô hình trained có đạt chỉ số Macro-F1 (≥ 0.85) và Latency budget hay không:
+### Cell 4: Kiểm tra Quality Gate & Benchmarking
 
-```bash
+```python
 !python scripts/validate_model.py \
     --model-path ./artifacts/xlm-roberta \
     --model-type transformer \
     --min-macro-f1 0.85
 ```
-
-Sau khi hoàn thành, bạn có thể nén thư mục `./artifacts/xlm-roberta` hoặc push weights lên HuggingFace Hub / MLflow Registry để phục vụ cho phần **Serving (FastAPI)** của dịch vụ.
