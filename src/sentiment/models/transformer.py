@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from src.sentiment.config import settings
-from src.sentiment/serving/predictor import Predictor
+from src.sentiment.serving.predictor import Predictor
 
 
 class TransformerPredictor(Predictor):
