@@ -18,7 +18,7 @@ contribution adjustment both depend on this table.
 | M1 | *(fill in)* | Data & Features | `src/sentiment/data/`, `tests/data/` |
 | M2 | *(fill in)* | Training & Experiments | `src/sentiment/models/`, `src/sentiment/training/`, `scripts/train_model.py`, `scripts/validate_model.py`, `tests/model/` |
 | M3 | *(fill in)* | Serving & Containers | `src/sentiment/serving/`, `Dockerfile`, `docker-compose.yml` |
-| M4 | *(fill in)* | Monitoring & CI/CD | `prometheus/`, `grafana/`, `alertmanager/`, `scripts/load_test.py`, `.github/workflows/`, `tests/integration/` |
+| M4 | Lê Công Huỳnh | Monitoring & CI/CD | `prometheus/`, `grafana/`, `alertmanager/`, `scripts/load_test.py`, `.github/workflows/`, `tests/integration/` |
 | M5 | *(fill in)* | Responsible AI & Docs | `src/sentiment/responsible/`, `scripts/run_fairness_probe.py`, `docs/`, `README.md`, `ARCHITECTURE.md` |
 
 Directory ownership is disjoint on purpose: it keeps merge conflicts rare and makes
@@ -47,12 +47,12 @@ the git history evidence of who did what, without anyone having to argue for it.
 | W1-03 | Data quality gate: schema, empties, duplicates, label balance — **fails the run** | M1 | W1-02 | Task 3 | TODO |
 | W1-04 | Splits + drift reference (seeded, stratified, logged as an artifact) | M1 | W1-03 | Task 4 | TODO |
 | W1-05 | `Predictor` protocol + deterministic `StubPredictor` | M3 | W1-01 | Task 5 | TODO |
-| W1-06 | Prometheus collectors (`http_*` / `ml_*`) + PSI `DriftTracker` | M4 | W1-04 | Task 6 | TODO |
+| W1-06 | Prometheus collectors (`http_*` / `ml_*`) + PSI `DriftTracker` | M4 | W1-04 | Task 6 | REVIEW |
 | W1-07 | FastAPI app: schemas, typed errors, `MetricsMiddleware`, `/health` `/ready` `/metrics` | M3 | W1-05, W1-06 | Task 7 | TODO |
 | W1-08 | Endpoints: `/predict`, `/predict/batch`, `/model/info` + ML instrumentation | M3 | W1-07 | Task 8 | TODO |
 | W1-09 | `Dockerfile` — multi-stage, non-root, `HEALTHCHECK` on `/ready` | M3 | W1-08 | Task 9 | TODO |
-| W1-10 | `docker-compose.yml` (6 services, health checks) + `prometheus/` + `grafana/` + `alertmanager/` + smoke test | M4 | W1-09 | Task 10 | TODO |
-| W1-11 | CI: lint / type-check → test matrix → container → `ci-status` | M4 | W1-10 | Task 11 | TODO |
+| W1-10 | `docker-compose.yml` (6 services, health checks) + `prometheus/` + `grafana/` + `alertmanager/` + smoke test | M4 | W1-09 | Task 10 | REVIEW |
+| W1-11 | CI: lint / type-check → test matrix → container → `ci-status` | M4 | W1-10 | Task 11 | REVIEW |
 | W1-12 | `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/user-guide.md`, `docs/TESTING_STRATEGY.md` | M5 | W1-10 | Task 12 | TODO |
 
 **Parallelism.** W1-01 blocks everything, so do it first and merge it fast — one person, one sitting. After that M1 runs W1-02→04 while M3 runs W1-05→08, independently. M4 starts W1-06 as soon as W1-04 lands. M5 has no code dependency and should start W1-12 immediately, filling in details as the other tracks land.
