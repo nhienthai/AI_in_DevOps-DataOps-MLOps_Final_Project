@@ -4,6 +4,7 @@
 import argparse
 import sys
 import os
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 import mlflow
 
 # Add project root to sys.path

@@ -25,7 +25,8 @@ class Settings:
     learning_rate: float = float(os.getenv("LEARNING_RATE", "2e-5"))
 
     # MLflow & Artifact configuration
-    mlflow_tracking_uri: str = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
+    os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+    mlflow_tracking_uri: str = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
     model_registry_name: str = os.getenv(
         "MODEL_REGISTRY_NAME", "sentiment-service-xlm-roberta"
     )
