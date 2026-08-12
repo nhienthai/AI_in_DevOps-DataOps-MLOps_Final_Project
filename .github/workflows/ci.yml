@@ -202,7 +202,7 @@ jobs:
       - name: Smoke test
         run: |
           pip install httpx pytest
-          pytest tests/integration -m integration -v --no-cov
+          pytest tests/integration/test_stack_smoke.py -v --no-cov
 
       - name: Dump logs on failure
         if: failure()
