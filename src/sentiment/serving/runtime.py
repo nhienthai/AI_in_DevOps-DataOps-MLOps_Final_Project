@@ -131,7 +131,7 @@ class InferenceRuntime:
             await asyncio.wait_for(
                 self._slots.acquire(), timeout=self.settings.queue_timeout_seconds
             )
-        except TimeoutError as exc:
+        except asyncio.TimeoutError as exc:
             INFERENCE_OVERLOADS.inc()
             raise InferenceOverloadedError("Inference capacity is full.") from exc
         finally:
@@ -147,7 +147,7 @@ class InferenceRuntime:
             predictions = await asyncio.wait_for(
                 asyncio.shield(future), timeout=self.settings.inference_timeout_seconds
             )
-        except TimeoutError as exc:
+        except asyncio.TimeoutError as exc:
             INFERENCE_TIMEOUTS.inc()
             future.add_done_callback(self._release_after_timeout)
             raise InferenceTimeoutError("Prediction exceeded its time limit.") from exc
