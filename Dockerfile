@@ -13,7 +13,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements-serving.txt pyproject.toml ./
 RUN pip install --upgrade pip==24.3.1 \
-    && pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu \
+    && pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu \
     && pip install --requirement requirements-serving.txt
 
 COPY src ./src
