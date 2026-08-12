@@ -71,6 +71,7 @@ jobs:
         # runtime dependency can never be missing here.
         run: |
           python -m pip install --upgrade pip
+          pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
           pip install mypy==1.8.0 types-requests pandas-stubs==2.3.3.260113
           pip install -e .
@@ -102,6 +103,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-dev.txt
           pip install -e .
 
