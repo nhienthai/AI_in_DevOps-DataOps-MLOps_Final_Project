@@ -61,11 +61,11 @@ def check(
     n_rows: int = len(df)
     text: pd.Series = df["text"].astype(str)  # type: ignore[assignment]
     stripped: pd.Series = text.str.strip()  # type: ignore[assignment]
-    n_empty: int = stripped.eq("").sum().item()  # type: ignore[union-attr]
-    n_duplicates: int = text.duplicated().sum().item()  # type: ignore[union-attr]
-    positive_ratio: float = df["label"].mean() if n_rows else 0.0  # type: ignore[assignment]
+    n_empty = int(stripped.eq("").sum())
+    n_duplicates = int(text.duplicated().sum())
+    positive_ratio = float(df["label"].mean()) if n_rows else 0.0
     lengths: pd.Series = text.str.len()  # type: ignore[assignment]
-    max_len: int = lengths.max().item() if n_rows else 0  # type: ignore[union-attr]
+    max_len = int(lengths.max()) if n_rows else 0
 
     if n_rows < min_rows:
         failures.append(f"too few rows: {n_rows} < {min_rows}")
