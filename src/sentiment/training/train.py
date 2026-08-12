@@ -117,8 +117,8 @@ def train_transformer_model(
         per_device_eval_batch_size=batch_size,
         num_train_epochs=epochs,
         weight_decay=0.01,
-        warmup_ratio=0.1,                      # Warmup 10% steps để ổn định training
-        lr_scheduler_type="cosine",            # Cosine decay tốt hơn linear khi train nhiều epochs
+        warmup_ratio=0.1,                      # 10% warmup steps
+        lr_scheduler_type="cosine",            # Cosine decay for long training
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
@@ -147,9 +147,9 @@ def train_transformer_model(
                 labels = inputs.pop("labels")
                 outputs = model(**inputs)
                 logits = outputs.logits
-                loss_fn = torch.nn.CrossEntropyLoss(
-                    weight=class_weights.to(model.device)
-                )
+                # Use next(model.parameters()).device — works for both single GPU and DataParallel
+                device = next(model.parameters()).device
+                loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights.to(device))
                 loss = loss_fn(logits, labels)
                 return (loss, outputs) if return_outputs else loss
 
