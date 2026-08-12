@@ -30,8 +30,23 @@ class Settings(BaseSettings):
 
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_experiment_name: str = "sentiment-amazon-polarity"
+    model_registry_name: str = "sentiment-service-xlm-roberta"
     model_stage: str = "Production"
     predictor_backend: Literal["stub", "registry"] = "stub"
+
+    model_name: str = "xlm-roberta-base"
+    num_labels: int = Field(default=3, ge=2)
+    label_map: dict[int, str] = Field(
+        default_factory=lambda: {0: "negative", 1: "neutral", 2: "positive"}
+    )
+    rev_label_map: dict[str, int] = Field(
+        default_factory=lambda: {"negative": 0, "neutral": 1, "positive": 2}
+    )
+    max_length: int = Field(default=256, gt=0)
+    batch_size: int = Field(default=16, gt=0)
+    epochs: int = Field(default=3, gt=0)
+    learning_rate: float = Field(default=2e-5, gt=0)
+    artifacts_dir: Path = Path("artifacts")
 
     log_level: str = "INFO"
 
@@ -40,3 +55,6 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return the process-wide settings singleton."""
     return Settings()
+
+
+settings = get_settings()

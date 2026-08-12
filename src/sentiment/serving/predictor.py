@@ -10,7 +10,7 @@ from typing import Literal, Protocol, runtime_checkable
 class Prediction:
     """One sentiment result produced by a predictor."""
 
-    label: Literal["positive", "negative"]
+    label: str
     score: float
     confidence: float
     truncated: bool
@@ -29,7 +29,7 @@ class Explanation:
     """Local explanation for a prediction."""
 
     method: Literal["lime"]
-    label: Literal["positive", "negative"]
+    label: str
     score: float
     attributions: tuple[TokenAttribution, ...]
 
@@ -55,7 +55,7 @@ class Explainer(Protocol):
 
 
 def _to_prediction(score: float, truncated: bool) -> Prediction:
-    """Build a consistent prediction from a positive-class probability."""
+    """Build a consistent binary prediction from a positive-class probability."""
     bounded_score = min(max(score, 0.0), 1.0)
     return Prediction(
         label="positive" if bounded_score >= 0.5 else "negative",
@@ -66,7 +66,7 @@ def _to_prediction(score: float, truncated: bool) -> Prediction:
 
 
 class StubPredictor:
-    """Deterministic placeholder used until M2 supplies the registry model."""
+    """Deterministic placeholder used until the registry model is configured."""
 
     version = "stub-0"
     stage = "Development"
