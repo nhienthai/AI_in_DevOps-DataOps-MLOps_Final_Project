@@ -20,10 +20,16 @@ def normalise(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"missing raw columns: {sorted(missing)}")
 
-    title: pd.Series = df["title"].fillna("").astype(str).str.strip()  # type: ignore[assignment]
-    content: pd.Series = df["content"].fillna("").astype(str).str.strip()  # type: ignore[assignment]
+    title: pd.Series = (  # type: ignore[assignment]
+        df["title"].fillna("").astype(str).str.strip()
+    )
+    content: pd.Series = (  # type: ignore[assignment]
+        df["content"].fillna("").astype(str).str.strip()
+    )
     combined: pd.Series = (title + ". " + content).astype(str)  # type: ignore[assignment]
-    text: pd.Series = combined.str.strip().str.removeprefix(". ").str.strip()  # type: ignore[assignment]
+    text: pd.Series = (  # type: ignore[assignment]
+        combined.str.strip().str.removeprefix(". ").str.strip()
+    )
 
     return pd.DataFrame({"label": df["label"].astype("int64"), "text": text})
 

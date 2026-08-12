@@ -12,7 +12,7 @@ MIN_OBSERVATIONS = 30
 
 @dataclass(frozen=True)
 class DriftReference:
-    """Minimal serving view of M1's model-specific drift artifact."""
+    """Dependency-light serving view of the training drift artifact."""
 
     length_bin_edges: tuple[float, ...]
     length_bin_freqs: tuple[float, ...]
