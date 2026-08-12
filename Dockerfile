@@ -17,7 +17,8 @@ RUN pip install --upgrade pip==24.3.1 \
     && pip install --requirement requirements-serving.txt
 
 COPY src ./src
-RUN pip install --no-deps .
+RUN pip install --no-deps . \
+    && python -m pip uninstall --yes pip setuptools wheel
 
 FROM python:3.11-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3 AS runtime
 
@@ -33,7 +34,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
     SENTIMENT_BUILD_REVISION="${BUILD_REVISION}"
 
 RUN groupadd --gid 1000 app \
-    && useradd --uid 1000 --gid app --create-home --shell /usr/sbin/nologin app
+    && useradd --uid 1000 --gid app --create-home --shell /usr/sbin/nologin app \
+    && python -m pip uninstall --yes pip setuptools wheel
 
 COPY --from=builder /opt/venv /opt/venv
 
