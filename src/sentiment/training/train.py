@@ -13,6 +13,7 @@ from datasets import load_dataset
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
+    EarlyStoppingCallback,
     Trainer,
     TrainingArguments,
 )
@@ -94,6 +95,18 @@ def train_transformer_model(
         model_name, num_labels=settings.num_labels
     )
 
+    # Compute class weights to handle NEUTRAL class imbalance (only ~4% of data)
+    from collections import Counter
+    import torch
+    label_counts = Counter(ds["train"]["Encoded_sentiment"])
+    total = sum(label_counts.values())
+    num_classes = settings.num_labels
+    class_weights = torch.tensor(
+        [total / (num_classes * label_counts.get(i, 1)) for i in range(num_classes)],
+        dtype=torch.float,
+    )
+    logger.info("Class weights: %s", class_weights.tolist())
+
     use_fp16 = torch.cuda.is_available()
     training_args = TrainingArguments(
         output_dir=output_dir,
@@ -104,10 +117,13 @@ def train_transformer_model(
         per_device_eval_batch_size=batch_size,
         num_train_epochs=epochs,
         weight_decay=0.01,
+        warmup_ratio=0.1,                      # Warmup 10% steps để ổn định training
+        lr_scheduler_type="cosine",            # Cosine decay tốt hơn linear khi train nhiều epochs
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=50,
+        save_total_limit=2,                    # Chỉ giữ 2 checkpoint gần nhất để tiết kiệm disk
         fp16=use_fp16,
         report_to=[],  # We manage MLflow manually via mlflow.start_run()
         dataloader_num_workers=2,
@@ -124,12 +140,26 @@ def train_transformer_model(
         })
 
         val_split = "validation" if "validation" in tokenized_ds else "dev"
-        trainer = Trainer(
+
+        # Custom Trainer with class weights for NEUTRAL imbalance
+        class WeightedTrainer(Trainer):
+            def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+                labels = inputs.pop("labels")
+                outputs = model(**inputs)
+                logits = outputs.logits
+                loss_fn = torch.nn.CrossEntropyLoss(
+                    weight=class_weights.to(model.device)
+                )
+                loss = loss_fn(logits, labels)
+                return (loss, outputs) if return_outputs else loss
+
+        trainer = WeightedTrainer(
             model=model,
             args=training_args,
             train_dataset=tokenized_ds["train"],
             eval_dataset=tokenized_ds[val_split],
             compute_metrics=compute_metrics,
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
         )
 
         logger.info("Starting Transformer fine-tuning...")
