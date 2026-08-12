@@ -14,7 +14,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, sontv/m3-serving]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -95,6 +95,8 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
+            requirements-serving.txt
+            requirements-training.txt
             requirements-dev.txt
 
       - name: Install dependencies
@@ -164,6 +166,20 @@ jobs:
           exit-code: "1"
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+
+      - name: Generate CycloneDX SBOM
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: sentiment-api:ci
+          format: cyclonedx
+          output: sentiment-api-sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentiment-api-sbom
+          path: sentiment-api-sbom.cdx.json
+          retention-days: 30
 
       - name: Start the stack
         run: |

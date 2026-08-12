@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, ge=1, le=65_535)
     max_text_length: int = Field(default=5_000, gt=0)
     max_batch_size: int = Field(default=64, gt=0, le=1_000)
+    max_request_body_bytes: int = Field(default=1_000_000, gt=0)
+    max_concurrent_inferences: int = Field(default=2, gt=0, le=64)
+    inference_timeout_seconds: float = Field(default=30.0, gt=0)
+    queue_timeout_seconds: float = Field(default=1.0, gt=0)
+    warmup_text: str = "Service warm-up review."
     low_confidence_threshold: float = Field(default=0.7, ge=0.5, le=1.0)
     drift_window_size: int = Field(default=1_000, ge=30)
 
@@ -33,8 +38,11 @@ class Settings(BaseSettings):
     model_registry_name: str = "sentiment-service-xlm-roberta"
     model_stage: str = "Production"
     predictor_backend: Literal["stub", "registry"] = "stub"
+    reload_token: str | None = None
+    build_revision: str = "unknown"
 
     model_name: str = "xlm-roberta-base"
+    model_dataset_name: str = "tridm/UIT-VSFC"
     num_labels: int = Field(default=3, ge=2)
     label_map: dict[int, str] = Field(
         default_factory=lambda: {0: "negative", 1: "neutral", 2: "positive"}
@@ -49,6 +57,12 @@ class Settings(BaseSettings):
     artifacts_dir: Path = Path("artifacts")
 
     log_level: str = "INFO"
+
+    @field_validator("reload_token", mode="before")
+    @classmethod
+    def blank_reload_token_is_disabled(cls, value: object) -> object:
+        """Treat an omitted or blank secret as a disabled reload endpoint."""
+        return None if value == "" else value
 
 
 @lru_cache

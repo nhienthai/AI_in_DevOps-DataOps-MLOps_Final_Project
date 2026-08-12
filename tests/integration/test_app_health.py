@@ -82,3 +82,68 @@ def test_registry_backend_uses_m2_loader_contract(
             }
     finally:
         get_settings.cache_clear()
+
+
+def test_token_protected_reload_atomically_updates_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    versions = iter(["v1", "v2"])
+
+    def load(_settings: Settings) -> StubPredictor:
+        predictor = StubPredictor()
+        predictor.version = next(versions)
+        return predictor
+
+    monkeypatch.setenv("SENTIMENT_RELOAD_TOKEN", "test-reload-secret")
+    get_settings.cache_clear()
+    try:
+        with TestClient(create_app(predictor_factory=load)) as reload_client:
+            unauthorized = reload_client.post("/reload")
+            assert unauthorized.status_code == 401
+            response = reload_client.post(
+                "/reload", headers={"x-reload-token": "test-reload-secret"}
+            )
+            assert response.status_code == 200
+            assert response.json() == {"status": "reloaded", "model_version": "v2"}
+            assert reload_client.get("/ready").json()["model_version"] == "v2"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_failed_reload_keeps_current_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def load(_settings: Settings) -> StubPredictor:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise RuntimeError("replacement corrupt")
+        predictor = StubPredictor()
+        predictor.version = "stable"
+        return predictor
+
+    monkeypatch.setenv("SENTIMENT_RELOAD_TOKEN", "test-reload-secret")
+    get_settings.cache_clear()
+    try:
+        with TestClient(create_app(predictor_factory=load)) as reload_client:
+            response = reload_client.post(
+                "/reload", headers={"x-reload-token": "test-reload-secret"}
+            )
+            assert response.status_code == 503
+            assert response.json()["error_code"] == "reload_failed"
+            assert reload_client.get("/ready").json()["model_version"] == "stable"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_request_body_limit_is_typed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SENTIMENT_MAX_REQUEST_BODY_BYTES", "20")
+    get_settings.cache_clear()
+    try:
+        with TestClient(create_app()) as limited_client:
+            response = limited_client.post("/api/v1/predict", json={"text": "x" * 100})
+            assert response.status_code == 413
+            assert response.json()["error_code"] == "request_too_large"
+            assert response.headers["x-request-id"] == response.json()["request_id"]
+    finally:
+        get_settings.cache_clear()

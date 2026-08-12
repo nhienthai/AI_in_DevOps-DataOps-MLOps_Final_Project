@@ -20,9 +20,7 @@ def normalise(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"missing raw columns: {sorted(missing)}")
 
-    title: pd.Series = (  # type: ignore[assignment]
-        df["title"].fillna("").astype(str).str.strip()
-    )
+    title: pd.Series = df["title"].fillna("").astype(str).str.strip()  # type: ignore[assignment]
     content: pd.Series = (  # type: ignore[assignment]
         df["content"].fillna("").astype(str).str.strip()
     )

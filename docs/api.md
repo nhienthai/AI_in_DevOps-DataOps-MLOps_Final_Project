@@ -32,7 +32,7 @@ Request:
 
 Response fields:
 
-- `label`: `positive` or `negative`.
+- `label`: `positive`, `neutral`, or `negative`.
 - `score`: probability of the positive class.
 - `confidence`: `max(score, 1 - score)`.
 - `model_version`: traceable serving-model version.
@@ -50,7 +50,14 @@ configured limit returns `413`.
 ### `GET /api/v1/model/info`
 
 Reports the serving version, lifecycle stage, predictor class, evaluation metrics,
-fairness delta, training timestamp, and MLflow run ID when supplied by the real predictor.
+fairness delta, training timestamp, MLflow run ID, and application build revision.
+
+### `POST /reload`
+
+When `SENTIMENT_RELOAD_TOKEN` is configured, send it in `X-Reload-Token` to load and warm
+a replacement registry model. The active model remains available during loading and is
+replaced atomically only after validation succeeds. A failed reload leaves the old model
+active. This operations endpoint should not be exposed outside the trusted control plane.
 
 ### `POST /api/v1/explain`
 
@@ -75,14 +82,24 @@ is not used as a metric label or included in API logs.
 
 ## Integration contracts for other owners
 
-- M2 registry loading: implement
-  `sentiment.models.registry.load_production_predictor(tracking_uri=..., stage=...)` and
-  return an object satisfying `sentiment.serving.predictor.Predictor`. Set
-  `SENTIMENT_PREDICTOR_BACKEND=registry` after that implementation lands.
-- M1 drift artifact: the real predictor may expose `drift_reference` with
-  `length_bin_edges`, `length_bin_freqs`, and `positive_prior`; otherwise the stub reference
-  remains active.
+- M2 registry loading: `sentiment.models.registry.load_production_predictor` downloads the
+  promoted Hugging Face artifact and attaches its MLflow metrics and provenance. Production
+  deployment sets `SENTIMENT_PREDICTOR_BACKEND=registry`.
+- M1 drift artifact: place `drift_reference.json` alongside the registered model artifact.
+  Its length bins, frequencies, and positive prior are loaded with the predictor; a safe
+  bootstrap reference remains available for older artifacts.
 - M5 explanation: inject an object satisfying `sentiment.serving.predictor.Explainer` when
   constructing the app.
 - M4 monitoring: provide the configuration mounted from `prometheus/`, `alertmanager/`, and
   `grafana/` by `docker-compose.yml`.
+
+## Runtime behaviour
+
+- Labels are `negative`, `neutral`, or `positive`.
+- `score` is the positive-class probability; `confidence` is the predicted-class probability.
+- Valid batch items are passed to the model in one call and restored to request order.
+- Synchronous model execution runs in a bounded worker pool rather than on the FastAPI event
+  loop. Queue saturation returns `429`; execution timeout returns `504`.
+- Readiness is published only after a warm-up prediction validates the model contract.
+- The serving image installs `requirements-serving.txt`; training-only dependencies stay out
+  of the runtime image.

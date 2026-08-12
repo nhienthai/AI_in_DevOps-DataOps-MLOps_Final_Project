@@ -5,6 +5,7 @@
 import argparse
 import os
 import sys
+
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 os.environ.setdefault("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 
@@ -12,11 +13,9 @@ os.environ.setdefault("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 import mlflow  # noqa: E402
+
 from sentiment.config import settings  # noqa: E402
-from sentiment.training.train import (  # noqa: E402
-    train_baseline_model,
-    train_transformer_model,
-)
+from sentiment.training.train import train_baseline_model, train_transformer_model  # noqa: E402
 
 
 def main():
@@ -36,7 +35,7 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        default=settings.dataset_name,
+        default=settings.model_dataset_name,
         help="HuggingFace dataset name (default: tridm/UIT-VSFC)",
     )
     parser.add_argument(

@@ -5,12 +5,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILD_REVISION: ${BUILD_REVISION:-development}
     ports:
       - "8000:8000"
     environment:
       SENTIMENT_MLFLOW_TRACKING_URI: http://mlflow:5000
       SENTIMENT_LOG_LEVEL: ${SENTIMENT_LOG_LEVEL:-INFO}
       SENTIMENT_PREDICTOR_BACKEND: ${SENTIMENT_PREDICTOR_BACKEND:-stub}
+      SENTIMENT_MAX_REQUEST_BODY_BYTES: ${SENTIMENT_MAX_REQUEST_BODY_BYTES:-1000000}
+      SENTIMENT_MAX_CONCURRENT_INFERENCES: ${SENTIMENT_MAX_CONCURRENT_INFERENCES:-2}
+      SENTIMENT_INFERENCE_TIMEOUT_SECONDS: ${SENTIMENT_INFERENCE_TIMEOUT_SECONDS:-30}
+      SENTIMENT_QUEUE_TIMEOUT_SECONDS: ${SENTIMENT_QUEUE_TIMEOUT_SECONDS:-1}
+      SENTIMENT_RELOAD_TOKEN: ${SENTIMENT_RELOAD_TOKEN:-}
+      SENTIMENT_BUILD_REVISION: ${BUILD_REVISION:-development}
     healthcheck:
       test:
         - CMD
@@ -27,13 +35,19 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: ${API_MEMORY_LIMIT:-2g}
+    cpus: ${API_CPU_LIMIT:-2.0}
+    stop_grace_period: 30s
     restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-mlflow}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-mlflow}
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -52,7 +66,7 @@ services:
       --backend-store-uri postgresql://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/${POSTGRES_DB:-mlflow}
       --artifacts-destination /mlartifacts --serve-artifacts"
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
       - mlflow-artifacts:/mlartifacts
     depends_on:
@@ -73,7 +87,7 @@ services:
   prometheus:
     image: prom/prometheus:v3.0.1
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
@@ -93,7 +107,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
     volumes:
       - ./alertmanager:/etc/alertmanager:ro
     command:
@@ -108,9 +122,9 @@ services:
   grafana:
     image: grafana/grafana:11.4.0
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

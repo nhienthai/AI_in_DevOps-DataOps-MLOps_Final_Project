@@ -1,0 +1,5 @@
+services:
+  api:
+    environment:
+      SENTIMENT_PREDICTOR_BACKEND: registry
+    restart: always

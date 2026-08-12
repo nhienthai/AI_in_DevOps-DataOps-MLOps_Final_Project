@@ -4,19 +4,18 @@
 import argparse
 import os
 import sys
+
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from datasets import load_dataset  # noqa: E402
+
 from sentiment.config import settings  # noqa: E402
 from sentiment.models.baseline import BaselinePredictor  # noqa: E402
 from sentiment.models.registry import register_and_promote_model  # noqa: E402
 from sentiment.models.transformer import TransformerPredictor  # noqa: E402
-from sentiment.training.evaluate import (  # noqa: E402
-    check_latency_budget,
-    evaluate_predictions,
-)
+from sentiment.training.evaluate import check_latency_budget, evaluate_predictions  # noqa: E402
 
 
 def main():
@@ -69,7 +68,7 @@ def main():
         predictor = TransformerPredictor.from_pretrained(args.model_path)
 
     # 1. Evaluate accuracy & macro F1 on test split
-    ds = load_dataset(settings.dataset_name)
+    ds = load_dataset(settings.model_dataset_name)
     test_texts = ds["test"]["Sentence"]
     test_labels = ds["test"]["Encoded_sentiment"]
 
@@ -84,9 +83,7 @@ def main():
     print(f"Macro F1: {macro_f1:.4f} (Required >= {args.min_macro_f1})")
 
     # 2. Check latency budget
-    latency_results = check_latency_budget(
-        predictor, p95_target_ms=args.max_p95_latency_ms
-    )
+    latency_results = check_latency_budget(predictor, p95_target_ms=args.max_p95_latency_ms)
     p95_ms = latency_results["p95_latency_ms"]
     print(f"p95 Latency: {p95_ms:.2f} ms (Target < {args.max_p95_latency_ms} ms)")
 

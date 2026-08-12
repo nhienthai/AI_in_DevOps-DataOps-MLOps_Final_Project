@@ -1,8 +1,12 @@
 """Training pipeline for baseline and XLM-RoBERTa transformer models with MLflow logging."""
 
+import json
 import logging
 import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict
+
 # ⚠️ MUST be set before mlflow import for MLflow 3.x compatibility
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 os.environ.setdefault("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
@@ -18,6 +22,7 @@ from transformers import (  # noqa: E402
 )
 
 from sentiment.config import settings  # noqa: E402
+from sentiment.data.preprocess import build_drift_reference  # noqa: E402
 from sentiment.models.baseline import BaselinePredictor  # noqa: E402
 from sentiment.training.evaluate import compute_metrics, evaluate_predictions  # noqa: E402
 
@@ -26,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 def train_baseline_model(
-    dataset_name: str = settings.dataset_name,
+    dataset_name: str = settings.model_dataset_name,
     output_path: str = "./artifacts/baseline_model.joblib",
 ) -> Dict[str, Any]:
     """Train TF-IDF + LogisticRegression baseline model and log to MLflow."""
@@ -65,7 +70,7 @@ def train_baseline_model(
 
 def train_transformer_model(
     model_name: str = settings.model_name,
-    dataset_name: str = settings.dataset_name,
+    dataset_name: str = settings.model_dataset_name,
     output_dir: str = "./artifacts/xlm-roberta",
     epochs: int = settings.epochs,
     batch_size: int = settings.batch_size,
@@ -114,14 +119,17 @@ def train_transformer_model(
     )
 
     with mlflow.start_run(run_name=f"fine-tune-{model_name.replace('/', '-')}"):
-        mlflow.log_params({
-            "model_name": model_name,
-            "dataset_name": dataset_name,
-            "epochs": epochs,
-            "batch_size": batch_size,
-            "learning_rate": learning_rate,
-            "max_length": max_length,
-        })
+        mlflow.set_tag("trained_at", datetime.now(timezone.utc).isoformat())
+        mlflow.log_params(
+            {
+                "model_name": model_name,
+                "dataset_name": dataset_name,
+                "epochs": epochs,
+                "batch_size": batch_size,
+                "learning_rate": learning_rate,
+                "max_length": max_length,
+            }
+        )
 
         val_split = "validation" if "validation" in tokenized_ds else "dev"
         trainer = Trainer(
@@ -147,6 +155,11 @@ def train_transformer_model(
         os.makedirs(output_dir, exist_ok=True)
         model.save_pretrained(output_dir)
         tokenizer.save_pretrained(output_dir)
+        drift_reference = build_drift_reference(
+            ds["train"]["Sentence"], ds["train"]["Encoded_sentiment"]
+        )
+        drift_path = Path(output_dir) / "drift_reference.json"
+        drift_path.write_text(json.dumps(drift_reference.to_dict()), encoding="utf-8")
         mlflow.log_artifacts(output_dir, artifact_path="model")
 
-        return test_results
+        return dict(test_results)

@@ -21,7 +21,7 @@ def test_api_serves_a_prediction():
     body = httpx.post(
         f"{API}/api/v1/predict", json={"text": "Excellent build quality."}, timeout=10
     ).json()
-    assert body["label"] in {"positive", "negative"}
+    assert body["label"] in {"positive", "neutral", "negative"}
     assert body["confidence"] >= 0.5
 
 

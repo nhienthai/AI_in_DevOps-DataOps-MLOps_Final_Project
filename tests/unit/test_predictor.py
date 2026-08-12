@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from sentiment.serving.predictor import Prediction, Predictor, StubPredictor
+from sentiment.serving.predictor import Prediction, Predictor, StubPredictor, validate_predictions
 
 
 def test_stub_satisfies_predictor_protocol() -> None:
@@ -36,3 +36,19 @@ def test_prediction_is_immutable() -> None:
     result = Prediction(label="positive", score=0.9, confidence=0.9, truncated=False)
     with pytest.raises(FrozenInstanceError):
         result.score = 0.1  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    "predictions",
+    [
+        [],
+        [Prediction("unsupported", 0.5, 0.5, False)],
+        [Prediction("positive", 1.1, 0.9, False)],
+        [Prediction("positive", 0.9, -0.1, False)],
+    ],
+)
+def test_predictor_output_validation_rejects_malformed_results(
+    predictions: list[Prediction],
+) -> None:
+    with pytest.raises(ValueError):
+        validate_predictions(predictions, 1)

@@ -2,6 +2,7 @@
 
 import time
 from typing import Any, Dict, List
+
 import numpy as np
 from sklearn.metrics import accuracy_score, classification_report, precision_recall_fscore_support
 
@@ -13,9 +14,7 @@ def compute_metrics(eval_pred) -> Dict[str, float]:
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
 
-    precision, recall, f1, _ = precision_recall_fscore_support(
-        labels, preds, average="macro"
-    )
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average="macro")
     acc = accuracy_score(labels, preds)
 
     return {

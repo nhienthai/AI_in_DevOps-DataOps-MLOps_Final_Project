@@ -2,13 +2,14 @@
 
 import os
 from collections.abc import Sequence
-from typing import List, Optional
+from typing import Any, List, Optional, cast
+
 import torch
 import torch.nn.functional as F
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from sentiment.config import settings
-from sentiment.serving.predictor import Prediction, Predictor
+from sentiment.serving.predictor import Prediction, Predictor, SentimentLabel
 
 
 class TransformerPredictor(Predictor):
@@ -25,6 +26,11 @@ class TransformerPredictor(Predictor):
         self.label_map = settings.label_map
         self.rev_label_map = settings.rev_label_map
         self.max_length = settings.max_length
+        self.stage = "Development"
+        self.metrics: dict[str, float] = {}
+        self.fairness_delta: float | None = None
+        self.trained_at: str | None = None
+        self.run_id: str | None = None
 
         if device:
             self.device = torch.device(device)
@@ -35,8 +41,8 @@ class TransformerPredictor(Predictor):
         else:
             self.device = torch.device("cpu")
 
-        self.tokenizer = None
-        self.model = None
+        self.tokenizer: Any = None
+        self.model: Any = None
         self._load_model()
 
     def _load_model(self) -> None:
@@ -54,8 +60,15 @@ class TransformerPredictor(Predictor):
         if not texts:
             return []
 
+        original_lengths = self.tokenizer(
+            list(texts),
+            add_special_tokens=True,
+            padding=False,
+            truncation=False,
+            return_length=True,
+        )["length"]
         inputs = self.tokenizer(
-            texts,
+            list(texts),
             padding=True,
             truncation=True,
             max_length=self.max_length,
@@ -71,15 +84,20 @@ class TransformerPredictor(Predictor):
         for i, _text in enumerate(texts):
             sample_probs = probs[i]
             pred_id = int(sample_probs.argmax())
-            pred_label = self.label_map.get(pred_id, "UNKNOWN")
+            pred_label = self.label_map.get(pred_id)
+            if pred_label not in {"negative", "neutral", "positive"}:
+                raise RuntimeError(f"Model returned unsupported label id {pred_id}.")
+            label = cast(SentimentLabel, pred_label)
             confidence = float(sample_probs[pred_id])
+            positive_id = self.rev_label_map["positive"]
+            positive_score = float(sample_probs[positive_id])
 
             results.append(
                 Prediction(
-                    label=pred_label,
-                    score=confidence,
+                    label=label,
+                    score=positive_score,
                     confidence=confidence,
-                    truncated=False,
+                    truncated=int(original_lengths[i]) > self.max_length,
                 )
             )
 

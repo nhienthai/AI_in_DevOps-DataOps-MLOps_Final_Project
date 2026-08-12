@@ -27,6 +27,10 @@ warn_unused_configs = true
 ignore_missing_imports = true
 exclude = ["venv", ".venv", "__pycache__", "tests"]
 
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

@@ -18,6 +18,7 @@ def test_defaults_match_the_service_contract() -> None:
     assert settings.low_confidence_threshold == 0.7
     assert settings.drift_window_size == 1_000
     assert settings.predictor_backend == "stub"
+    assert settings.model_dataset_name == "tridm/UIT-VSFC"
 
 
 def test_sentiment_environment_prefix_overrides_defaults(
@@ -35,3 +36,12 @@ def test_invalid_batch_size_is_rejected() -> None:
 def test_get_settings_is_cached() -> None:
     get_settings.cache_clear()
     assert get_settings() is get_settings()
+
+
+def test_blank_reload_token_disables_reload(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SENTIMENT_RELOAD_TOKEN", "")
+    get_settings.cache_clear()
+    try:
+        assert get_settings().reload_token is None
+    finally:
+        get_settings.cache_clear()

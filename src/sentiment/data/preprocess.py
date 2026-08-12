@@ -89,7 +89,8 @@ def build_drift_reference(
     edges[0] = 0.0
     edges[-1] = float(lengths.max()) * 10.0
 
-    counts, _ = np.histogram(lengths, bins=edges)
+    histogram: Any = np.histogram(lengths, bins=edges)
+    counts: Any = histogram[0]
     freqs = counts / counts.sum()
 
     return DriftReference(

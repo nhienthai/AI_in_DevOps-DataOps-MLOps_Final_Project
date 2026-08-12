@@ -7,10 +7,7 @@ pytest.importorskip("sklearn")
 
 from sentiment.models.baseline import BaselinePredictor  # noqa: E402
 from sentiment.serving.predictor import StubPredictor  # noqa: E402
-from sentiment.training.evaluate import (  # noqa: E402
-    check_latency_budget,
-    evaluate_predictions,
-)
+from sentiment.training.evaluate import check_latency_budget, evaluate_predictions  # noqa: E402
 
 
 def test_stub_predictor() -> None:
@@ -47,9 +44,7 @@ def test_evaluate_predictions() -> None:
 
 
 def test_latency_budget() -> None:
-    latency_info = check_latency_budget(
-        StubPredictor(), p95_target_ms=50.0, num_runs=10
-    )
+    latency_info = check_latency_budget(StubPredictor(), p95_target_ms=50.0, num_runs=10)
 
     assert "p95_latency_ms" in latency_info
     assert latency_info["passed_sla"] is True

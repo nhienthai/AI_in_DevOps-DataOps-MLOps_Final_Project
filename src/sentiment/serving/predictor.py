@@ -5,12 +5,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
+SentimentLabel = Literal["negative", "neutral", "positive"]
+
 
 @dataclass(frozen=True)
 class Prediction:
     """One sentiment result produced by a predictor."""
 
-    label: str
+    label: SentimentLabel
     score: float
     confidence: float
     truncated: bool
@@ -29,7 +31,7 @@ class Explanation:
     """Local explanation for a prediction."""
 
     method: Literal["lime"]
-    label: str
+    label: SentimentLabel
     score: float
     attributions: tuple[TokenAttribution, ...]
 
@@ -43,6 +45,19 @@ class Predictor(Protocol):
     def predict(self, texts: Sequence[str]) -> list[Prediction]:
         """Return one prediction for each input text."""
         ...
+
+
+def validate_predictions(predictions: Sequence[Prediction], expected: int) -> None:
+    """Reject malformed predictor output before it reaches the HTTP contract."""
+    if len(predictions) != expected:
+        raise ValueError(f"predictor returned {len(predictions)} results for {expected} inputs")
+    for prediction in predictions:
+        if prediction.label not in {"negative", "neutral", "positive"}:
+            raise ValueError(f"unsupported prediction label: {prediction.label}")
+        if not 0.0 <= prediction.score <= 1.0:
+            raise ValueError("prediction score must be between zero and one")
+        if not 0.0 <= prediction.confidence <= 1.0:
+            raise ValueError("prediction confidence must be between zero and one")
 
 
 @runtime_checkable
