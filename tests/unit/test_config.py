@@ -33,6 +33,19 @@ def test_invalid_batch_size_is_rejected() -> None:
         Settings(max_batch_size=0)
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"num_labels": 2},
+        {"label_map": {0: "negative", 1: "positive", 2: "positive"}},
+        {"rev_label_map": {"negative": 0, "neutral": 2, "positive": 1}},
+    ],
+)
+def test_inconsistent_label_contract_is_rejected(overrides: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        Settings(**overrides)
+
+
 def test_get_settings_is_cached() -> None:
     get_settings.cache_clear()
     assert get_settings() is get_settings()

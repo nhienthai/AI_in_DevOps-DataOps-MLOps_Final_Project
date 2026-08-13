@@ -98,7 +98,10 @@ def train_transformer_model(
     tokenized_ds = tokenized_ds.rename_column("Encoded_sentiment", "label")
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_name, num_labels=settings.num_labels
+        model_name,
+        num_labels=settings.num_labels,
+        id2label=settings.label_map,
+        label2id=settings.rev_label_map,
     )
 
     # Compute balanced weights so the minority neutral class contributes equally.

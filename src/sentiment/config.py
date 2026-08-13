@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     model_name: str = "xlm-roberta-base"
     model_dataset_name: str = "tridm/UIT-VSFC"
-    num_labels: int = Field(default=3, ge=2)
+    num_labels: Literal[3] = 3
     label_map: dict[int, str] = Field(
         default_factory=lambda: {0: "negative", 1: "neutral", 2: "positive"}
     )
@@ -63,6 +63,20 @@ class Settings(BaseSettings):
     def blank_reload_token_is_disabled(cls, value: object) -> object:
         """Treat an omitted or blank secret as a disabled reload endpoint."""
         return None if value == "" else value
+
+    @model_validator(mode="after")
+    def label_maps_match_the_public_contract(self) -> "Settings":
+        """Reject configurations that would silently relabel model outputs."""
+        expected_labels = {"negative", "neutral", "positive"}
+        expected_ids = set(range(self.num_labels))
+        if set(self.label_map) != expected_ids:
+            raise ValueError(f"label_map must contain ids {sorted(expected_ids)}")
+        if set(self.label_map.values()) != expected_labels:
+            raise ValueError(f"label_map must contain labels {sorted(expected_labels)}")
+        inverse = {label: label_id for label_id, label in self.label_map.items()}
+        if self.rev_label_map != inverse:
+            raise ValueError("rev_label_map must be the inverse of label_map")
+        return self
 
 
 @lru_cache

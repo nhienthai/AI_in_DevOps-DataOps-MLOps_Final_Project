@@ -6,10 +6,26 @@ from typing import Any, List, Optional, cast
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer
 
 from sentiment.config import settings
 from sentiment.serving.predictor import Prediction, Predictor, SentimentLabel
+
+
+def _validate_model_label_map(raw_map: object, expected: dict[int, str]) -> None:
+    """Allow generic Hugging Face labels but reject contradictory semantic labels."""
+    if not isinstance(raw_map, dict):
+        raise RuntimeError("Model config does not contain a valid id2label mapping.")
+    try:
+        normalized = {int(label_id): str(label).lower() for label_id, label in raw_map.items()}
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Model config contains an invalid id2label mapping.") from exc
+
+    is_generic = all(label == f"label_{label_id}" for label_id, label in normalized.items())
+    if not is_generic and normalized != expected:
+        raise RuntimeError(
+            f"Model label mapping {normalized} does not match serving contract {expected}."
+        )
 
 
 class TransformerPredictor(Predictor):
@@ -47,10 +63,14 @@ class TransformerPredictor(Predictor):
 
     def _load_model(self) -> None:
         """Load tokenizer and model architecture."""
+        config = AutoConfig.from_pretrained(self.model_name_or_path)
+        _validate_model_label_map(config.id2label, self.label_map)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name_or_path,
             num_labels=settings.num_labels,
+            id2label=self.label_map,
+            label2id=self.rev_label_map,
         )
         self.model.to(self.device)
         self.model.eval()
