@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
@@ -100,9 +101,7 @@ def train_transformer_model(
         model_name, num_labels=settings.num_labels
     )
 
-    # Compute class weights to handle NEUTRAL class imbalance (only ~4% of data)
-    from collections import Counter
-    import torch
+    # Compute balanced weights so the minority neutral class contributes equally.
     label_counts = Counter(ds["train"]["Encoded_sentiment"])
     total = sum(label_counts.values())
     num_classes = settings.num_labels
@@ -122,13 +121,13 @@ def train_transformer_model(
         per_device_eval_batch_size=batch_size,
         num_train_epochs=epochs,
         weight_decay=0.01,
-        warmup_ratio=0.1,                      # 10% warmup steps
-        lr_scheduler_type="cosine",            # Cosine decay for long training
+        warmup_ratio=0.1,
+        lr_scheduler_type="cosine",
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=50,
-        save_total_limit=2,                    # Chỉ giữ 2 checkpoint gần nhất để tiết kiệm disk
+        save_total_limit=2,  # Chỉ giữ 2 checkpoint gần nhất để tiết kiệm disk
         fp16=use_fp16,
         report_to=[],  # We manage MLflow manually via mlflow.start_run()
         dataloader_num_workers=2,
