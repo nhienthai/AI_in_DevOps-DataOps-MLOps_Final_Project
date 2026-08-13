@@ -3,6 +3,8 @@
 Run with: docker compose up -d && pytest tests/integration -m integration
 """
 
+import time
+
 import httpx
 import pytest
 
@@ -26,12 +28,20 @@ def test_api_serves_a_prediction():
 
 
 def test_prometheus_has_scraped_the_api():
-    result = httpx.get(
-        f"{PROM}/api/v1/query", params={"query": 'up{job="sentiment-api"}'}, timeout=10
-    ).json()
-    assert result["status"] == "success"
-    assert result["data"]["result"], "prometheus has no samples for the api target"
-    assert result["data"]["result"][0]["value"][1] == "1"
+    deadline = time.monotonic() + 30
+    latest_result = None
+    while time.monotonic() < deadline:
+        latest_result = httpx.get(
+            f"{PROM}/api/v1/query",
+            params={"query": 'up{job="sentiment-api"}'},
+            timeout=10,
+        ).json()
+        samples = latest_result.get("data", {}).get("result", [])
+        if samples and samples[0]["value"][1] == "1":
+            return
+        time.sleep(1)
+
+    pytest.fail(f"Prometheus did not scrape the API before timeout: {latest_result}")
 
 
 def test_alert_rules_are_loaded():

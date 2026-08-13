@@ -1,4 +1,7 @@
-"""Unit tests for baseline models and evaluation metrics."""
+"""Unit tests for model contracts and evaluation metrics."""
+
+import json
+from pathlib import Path
 
 import pytest
 
@@ -6,6 +9,7 @@ pytest.importorskip("joblib")
 pytest.importorskip("sklearn")
 
 from sentiment.models.baseline import BaselinePredictor  # noqa: E402
+from sentiment.models.transformer import _validate_model_label_map  # noqa: E402
 from sentiment.serving.predictor import StubPredictor  # noqa: E402
 from sentiment.training.evaluate import check_latency_budget, evaluate_predictions  # noqa: E402
 
@@ -48,3 +52,24 @@ def test_latency_budget() -> None:
 
     assert "p95_latency_ms" in latency_info
     assert latency_info["passed_sla"] is True
+
+
+def test_transformer_label_metadata_must_match_serving_contract() -> None:
+    expected = {0: "negative", 1: "neutral", 2: "positive"}
+    _validate_model_label_map({0: "LABEL_0", 1: "LABEL_1", 2: "LABEL_2"}, expected)
+    _validate_model_label_map({0: "NEGATIVE", 1: "NEUTRAL", 2: "POSITIVE"}, expected)
+
+    with pytest.raises(RuntimeError, match="does not match serving contract"):
+        _validate_model_label_map({0: "positive", 1: "neutral", 2: "negative"}, expected)
+
+
+def test_kaggle_notebook_is_clean_and_reproducible() -> None:
+    notebook_path = Path(__file__).parents[2] / "notebooks" / "train-xlm-roberta.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+
+    assert notebook["metadata"]["kaggle"]["isInternetEnabled"] is True
+    assert notebook["metadata"]["kaggle"]["isGpuEnabled"] is True
+    assert all(not cell.get("outputs") for cell in notebook["cells"])
+    assert "--branch', 'main'" in sources
+    assert "'pip', 'install', '-q', '-e', '.'" in sources

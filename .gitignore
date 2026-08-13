@@ -17,6 +17,9 @@ data/interim/
 *.pt
 *.bin
 *.onnx
+*.zip
+*.db
+artifacts/
 
 # MLflow
 mlruns/
