@@ -1,0 +1,54 @@
+groups:
+  - name: ml_alerts
+    rules:
+      - alert: ModelNotLoaded
+        expr: ml_model_loaded == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "ML model not loaded"
+          description: "The API is up but no model is loaded; predictions return 503."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#modelnotloaded"
+
+      - alert: PredictionSkew
+        expr: |
+          abs(
+            sum(rate(ml_predictions_total{label="positive"}[15m]))
+              / clamp_min(sum(rate(ml_predictions_total[15m])), 0.001)
+            - 0.5
+          ) > 0.2
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Positive-class rate deviates more than 20pp from the training prior"
+          description: "Positive share has drifted to {{ $value | humanizePercentage }} away from 0.5."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#predictionskew"
+
+      - alert: DriftDetected
+        expr: ml_drift_psi > 0.2
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Input length PSI above 0.2 (conventional significant-shift boundary)"
+          description: "PSI is {{ $value }} against the training reference."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#driftdetected"
+
+      - alert: HighPredictionErrorRate
+        expr: |
+          rate(ml_prediction_errors_total[5m])
+            / clamp_min(rate(ml_predictions_total[5m]), 0.000001) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "High prediction error rate"
+          description: "{{ $value | humanizePercentage }} of predictions are failing."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#highpredictionerrorrate"
+
+      - alert: ModelStale
+        expr: time() - ml_model_last_reload_timestamp > 604800
+        for: 1h
+        labels: {severity: info}
+        annotations:
+          summary: "ML model may be stale"
+          description: "Model has not been reloaded in {{ $value | humanizeDuration }}."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#modelstale"

@@ -17,8 +17,8 @@ contribution adjustment both depend on this table.
 |---|---|---|---|
 | M1 | *(fill in)* | Data & Features | `src/sentiment/data/`, `tests/data/` |
 | M2 | *(fill in)* | Training & Experiments | `src/sentiment/models/`, `src/sentiment/training/`, `scripts/train_model.py`, `scripts/validate_model.py`, `tests/model/` |
-| M3 | *(fill in)* | Serving & Containers | `src/sentiment/serving/`, `Dockerfile`, `docker-compose.yml` |
-| M4 | *(fill in)* | Monitoring & CI/CD | `prometheus/`, `grafana/`, `alertmanager/`, `scripts/load_test.py`, `.github/workflows/`, `tests/integration/` |
+| M3 | Son TV | Serving & Containers | `src/sentiment/serving/`, `Dockerfile`, `docker-compose.yml` |
+| M4 | Lê Công Huỳnh | Monitoring & CI/CD | `prometheus/`, `grafana/`, `alertmanager/`, `scripts/load_test.py`, `.github/workflows/`, `tests/integration/` |
 | M5 | *(fill in)* | Responsible AI & Docs | `src/sentiment/responsible/`, `scripts/run_fairness_probe.py`, `docs/`, `README.md`, `ARCHITECTURE.md` |
 
 Directory ownership is disjoint on purpose: it keeps merge conflicts rare and makes
@@ -42,17 +42,17 @@ the git history evidence of who did what, without anyone having to argue for it.
 
 | ID | Task | Owner | Depends on | Plan | Status |
 |---|---|---|---|---|---|
-| W1-01 | Scaffold: `pyproject.toml`, `requirements*.txt`, `.flake8`, `Makefile`, `.env.example`, `conftest.py`, `config.py` + tests | M3 | — | Task 1 | TODO |
+| W1-01 | Scaffold: `pyproject.toml`, `requirements*.txt`, `.flake8`, `Makefile`, `.env.example`, `conftest.py`, `config.py` + tests | M3 | — | Task 1 | REVIEW |
 | W1-02 | Data ingestion: `amazon_polarity` → normalised Parquet | M1 | W1-01 | Task 2 | TODO |
 | W1-03 | Data quality gate: schema, empties, duplicates, label balance — **fails the run** | M1 | W1-02 | Task 3 | TODO |
 | W1-04 | Splits + drift reference (seeded, stratified, logged as an artifact) | M1 | W1-03 | Task 4 | TODO |
-| W1-05 | `Predictor` protocol + deterministic `StubPredictor` | M3 | W1-01 | Task 5 | TODO |
-| W1-06 | Prometheus collectors (`http_*` / `ml_*`) + PSI `DriftTracker` | M4 | W1-04 | Task 6 | TODO |
-| W1-07 | FastAPI app: schemas, typed errors, `MetricsMiddleware`, `/health` `/ready` `/metrics` | M3 | W1-05, W1-06 | Task 7 | TODO |
-| W1-08 | Endpoints: `/predict`, `/predict/batch`, `/model/info` + ML instrumentation | M3 | W1-07 | Task 8 | TODO |
-| W1-09 | `Dockerfile` — multi-stage, non-root, `HEALTHCHECK` on `/ready` | M3 | W1-08 | Task 9 | TODO |
-| W1-10 | `docker-compose.yml` (6 services, health checks) + `prometheus/` + `grafana/` + `alertmanager/` + smoke test | M4 | W1-09 | Task 10 | TODO |
-| W1-11 | CI: lint / type-check → test matrix → container → `ci-status` | M4 | W1-10 | Task 11 | TODO |
+| W1-05 | `Predictor` protocol + deterministic `StubPredictor` | M3 | W1-01 | Task 5 | REVIEW |
+| W1-06 | Prometheus collectors (`http_*` / `ml_*`) + PSI `DriftTracker` | M4 | W1-04 | Task 6 | REVIEW |
+| W1-07 | FastAPI app: schemas, typed errors, `MetricsMiddleware`, `/health` `/ready` `/metrics` | M3 | W1-05, W1-06 | Task 7 | REVIEW |
+| W1-08 | Endpoints: `/predict`, `/predict/batch`, `/model/info` + ML instrumentation | M3 | W1-07 | Task 8 | REVIEW |
+| W1-09 | `Dockerfile` — multi-stage, non-root, `HEALTHCHECK` on `/ready` | M3 | W1-08 | Task 9 | REVIEW |
+| W1-10 | `docker-compose.yml` (6 services, health checks) + `prometheus/` + `grafana/` + `alertmanager/` + smoke test | M4 | W1-09 | Task 10 | REVIEW |
+| W1-11 | CI: lint / type-check → test matrix → container → `ci-status` | M4 | W1-10 | Task 11 | REVIEW |
 | W1-12 | `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/user-guide.md`, `docs/TESTING_STRATEGY.md` | M5 | W1-10 | Task 12 | TODO |
 
 **Parallelism.** W1-01 blocks everything, so do it first and merge it fast — one person, one sitting. After that M1 runs W1-02→04 while M3 runs W1-05→08, independently. M4 starts W1-06 as soon as W1-04 lands. M5 has no code dependency and should start W1-12 immediately, filling in details as the other tracks land.
@@ -87,7 +87,7 @@ the git history evidence of who did what, without anyone having to argue for it.
 | W2-05 | Optuna sweep, one nested MLflow run per trial | M2 | W2-04 | §3.2 | TODO |
 | W2-06 | `evaluate.py`: metrics, plots, and the **fairness-gated promotion rule** | M2 | W2-04 | §3.2, §4.4 | TODO |
 | W2-07 | `scripts/validate_model.py` — quality gate callable from CI | M2 | W2-06 | §4.3 | TODO |
-| W2-08 | Swap `StubPredictor` → `TransformerPredictor` in `_lifespan`; load drift reference from the MLflow artifact | M3 | W2-01, W2-03 | §2.3 | TODO |
+| W2-08 | Swap `StubPredictor` → `TransformerPredictor` in `_lifespan`; load drift reference from the MLflow artifact | M3 | W2-01, W2-03 | §2.3 | REVIEW |
 | W2-09 | Model behaviour tests: known-positive/negative, calibration bounds, latency budget | M2 | W2-08 | §4.1 | TODO |
 | W2-10 | Add `training` profile to compose; add MLflow scrape target | M4 | W2-04 | §3.4 | TODO |
 | W2-11 | Nightly workflow for `@pytest.mark.slow` transformer tests | M4 | W2-09 | §4.3 | TODO |
@@ -123,7 +123,7 @@ Week 1 was built wrong — stop and fix the boundary rather than working around 
 | W3-07 | Fairness **mitigation**: counterfactual augmentation + reweighting, re-measure | M5 | W3-05 | §5.1 | TODO |
 | W3-08 | **Before/after fairness table** — the artifact that earns the top band | M5 | W3-07 | §5.1 | TODO |
 | W3-09 | SHAP global importance, logged as an MLflow artifact | M5 | W2-08 | §5.2 | TODO |
-| W3-10 | LIME local explanations + `POST /api/v1/explain` endpoint | M5, M3 | W2-08 | §5.2 | TODO |
+| W3-10 | LIME local explanations + `POST /api/v1/explain` endpoint | M5, M3 | W2-08 | §5.2 | WIP |
 | W3-11 | Ethics & privacy write-up: PII scrubbing, no-body logging, failure modes | M5 | — | §5.3, §5.4 | TODO |
 | W3-12 | Raise coverage to ≥ 80% across all four test types; fill gaps | all | — | §4 | TODO |
 | W3-13 | Alert runbooks in `docs/user-guide.md`, one `##` per alert, anchors verified | M5 | W3-06 | §6 | TODO |
@@ -155,7 +155,7 @@ presentation grade and rehearsal time is what protects it.
 | W4-02 | README polish: badges, quickstart, `curl` examples with real output, troubleshooting | M5 | — | TODO |
 | W4-03 | `ARCHITECTURE.md` final pass; diagrams match what actually runs | M5 | — | TODO |
 | W4-04 | `CONTRIBUTING.md` with real names and per-member contribution summary | M5 | — | TODO |
-| W4-05 | OpenAPI examples on every schema; `docs/api.md` cross-check | M3 | — | TODO |
+| W4-05 | OpenAPI examples on every schema; `docs/api.md` cross-check | M3 | — | REVIEW |
 | W4-06 | Slide deck (15-20 min): problem → architecture → deep dive → responsible AI → demo | all | — | TODO |
 | W4-07 | **Rehearsal 1**: clean `git clone` on a machine that has never run this | all | W4-01..05 | TODO |
 | W4-08 | Fix everything rehearsal 1 broke | all | W4-07 | TODO |

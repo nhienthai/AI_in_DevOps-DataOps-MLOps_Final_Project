@@ -1,0 +1,224 @@
+# =============================================================================
+# CI Pipeline for Sentiment Service
+# DDM501 - Final Project
+#
+#   lint ─┐
+#         ├─> test (3.10, 3.11) ─> container (build, scan, smoke) ─> ci-status
+#   type ─┘
+#
+# Lint and type checks finish in seconds and stop a bad commit before anyone
+# pays for a Docker build.
+# =============================================================================
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop, sontv/m3-serving]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_DEFAULT: "3.10"
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install linters
+        # Pinned to the same versions as requirements-dev.txt: an unpinned
+        # release can turn the build red with no code change.
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8==7.0.0 black==23.12.1 isort==5.13.2
+
+      - name: Run flake8
+        run: flake8 src/ tests/ scripts/
+
+      - name: Check black formatting
+        run: black --check --diff src/ tests/ scripts/
+
+      - name: Check import sorting
+        run: isort --check-only --diff src/ tests/ scripts/
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+
+      - name: Install dependencies
+        # Derived from requirements.txt rather than hand-listed, so a new
+        # runtime dependency can never be missing here.
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install mypy==1.8.0 types-requests pandas-stubs==2.3.3.260113
+          pip install -e .
+
+      - name: Run mypy
+        run: mypy src/ scripts/ --ignore-missing-imports
+
+  test:
+    name: Run Tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: [lint, type-check]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-serving.txt
+            requirements-training.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            -m "not slow and not integration" \
+            --cov=sentiment \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=80 \
+            --junitxml=junit.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-py${{ matrix.python-version }}
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: junit.xml
+          retention-days: 14
+
+  container:
+    name: Build, Scan, Smoke
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: sentiment-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sentiment-api:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Generate CycloneDX SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sentiment-api:ci
+          format: cyclonedx
+          output: sentiment-api-sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentiment-api-sbom
+          path: sentiment-api-sbom.cdx.json
+          retention-days: 30
+
+      - name: Start the stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+
+      - name: Wait for the API to become ready
+        # /ready, not /health: a container that is up but serving 503 because no
+        # model loaded is still a broken release.
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/ready; then exit 0; fi
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+
+      - name: Smoke test
+        run: |
+          pip install httpx pytest
+          pytest tests/integration/test_stack_smoke.py -v
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose --env-file .env.example logs
+
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, test, container]
+    if: always()
+    steps:
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more CI jobs failed."
+          exit 1
+
+      - name: Report success
+        run: echo "All CI checks passed."
