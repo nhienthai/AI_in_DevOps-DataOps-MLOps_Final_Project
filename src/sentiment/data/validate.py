@@ -1,6 +1,7 @@
 """The data quality gate. Failures stop the pipeline rather than warn."""
 
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
 
@@ -79,7 +80,10 @@ def check(
     lengths: pd.Series = text.str.len()  # type: ignore[assignment]
     max_len = int(lengths.max()) if n_rows else 0
 
-    counts = df["label"].value_counts().to_dict() if n_rows else {}
+    # value_counts().to_dict() is typed dict[Hashable, int] once pandas stubs are
+    # installed, and Hashable cannot be passed to int(). The label column is
+    # integer-typed by the schema contract, so the narrowing is safe to state.
+    counts: dict[Any, int] = df["label"].value_counts().to_dict() if n_rows else {}
     shares = {int(label): count / n_rows for label, count in counts.items()} if n_rows else {}
     rarest = min(shares.values()) if shares else 0.0
 
