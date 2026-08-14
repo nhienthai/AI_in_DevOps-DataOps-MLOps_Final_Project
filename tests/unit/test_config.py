@@ -8,7 +8,8 @@ from sentiment.config import Settings, get_settings
 
 def test_defaults_match_the_service_contract() -> None:
     settings = Settings()
-    assert settings.dataset_name == "amazon_polarity"
+    assert settings.dataset_name == "tridm/UIT-VSFC"
+    assert settings.dataset_name == settings.model_dataset_name
     assert settings.train_size == 200_000
     assert settings.val_size == 25_000
     assert settings.test_size == 25_000

@@ -18,13 +18,29 @@ def register_and_promote_model(
     model_name: str = settings.model_registry_name,
     stage: str = "Production",
     archive_existing: bool = True,
+    tracking_uri: str | None = None,
 ) -> str:
-    """Register a model run and promote the resulting version."""
+    """Register a model run and promote the resulting version.
+
+    Args:
+        run_id: The MLflow run holding the artifact.
+        artifact_path: Artifact subdirectory within the run.
+        model_name: Registered model name.
+        stage: Target stage.
+        archive_existing: Archive whatever currently occupies ``stage``.
+        tracking_uri: Overrides the configured URI. The default points at the
+            Compose-internal ``http://mlflow:5000``, which does not resolve from
+            the host, so anything promoting from a laptop must pass this.
+
+    Returns:
+        The new model version, as a string.
+    """
     import mlflow
     from mlflow.tracking import MlflowClient
 
-    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    client = MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
+    uri = tracking_uri or settings.mlflow_tracking_uri
+    mlflow.set_tracking_uri(uri)
+    client = MlflowClient(tracking_uri=uri)
     model_uri = f"runs:/{run_id}/{artifact_path}"
     model_version = mlflow.register_model(model_uri=model_uri, name=model_name)
     client.transition_model_version_stage(
@@ -70,7 +86,14 @@ def load_production_predictor(
     stage: str = "Production",
     model_name: str = settings.model_registry_name,
 ) -> Predictor:
-    """Download the promoted Hugging Face artifact and expose serving metadata."""
+    """Download the promoted artifact and expose its serving metadata.
+
+    Dispatches on what the run actually logged: a ``*.joblib`` file is the
+    TF-IDF baseline, anything else is a Hugging Face directory. The baseline
+    matters beyond being a fallback — it is the only model that trains and serves
+    on CPU in seconds, so it is what makes ``predictor_backend=registry``
+    demonstrable without a GPU.
+    """
     import mlflow
     from mlflow.tracking import MlflowClient
 
@@ -81,10 +104,22 @@ def load_production_predictor(
     version = _latest_version(client, model_name, stage)
     run = client.get_run(version.run_id)
     artifact_root = Path(client.download_artifacts(version.run_id, "model"))
-    model_directory = _find_transformer_directory(artifact_root)
-    predictor = TransformerPredictor.from_pretrained(
-        str(model_directory), model_version=str(version.version)
-    )
+
+    # Typed Any rather than Predictor: the protocol declares only `version` and
+    # `predict`, while the concrete classes also carry the serving metadata set
+    # below. Widening the protocol to cover metadata would force every predictor
+    # to implement fields the serving layer already reads defensively.
+    predictor: Any
+    joblib_files = sorted(artifact_root.glob("*.joblib"))
+    if joblib_files:
+        from sentiment.models.baseline import BaselinePredictor
+
+        predictor = BaselinePredictor.load(str(joblib_files[0]), model_version=str(version.version))
+    else:
+        model_directory = _find_transformer_directory(artifact_root)
+        predictor = TransformerPredictor.from_pretrained(
+            str(model_directory), model_version=str(version.version)
+        )
     predictor.stage = stage
     predictor.run_id = str(version.run_id)
     predictor.trained_at = run.data.tags.get("trained_at")
@@ -100,6 +135,11 @@ def load_production_predictor(
         version.version,
         stage,
     )
+    if not isinstance(predictor, Predictor):
+        raise RuntimeError(
+            f"Registered model {model_name} v{version.version} does not satisfy the "
+            "Predictor protocol."
+        )
     return predictor
 
 

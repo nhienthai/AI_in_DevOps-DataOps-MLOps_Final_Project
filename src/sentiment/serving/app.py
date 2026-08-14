@@ -1,8 +1,9 @@
 """FastAPI application factory for the sentiment serving service."""
 
 import asyncio
+import logging
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -46,6 +47,8 @@ from sentiment.serving.schemas import (
     ReadyResponse,
     ReloadResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 _BOOTSTRAP_REFERENCE = DriftReference(
     length_bin_edges=(0.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 100_000.0),
@@ -136,19 +139,59 @@ def _prediction_response(
     )
 
 
+def _default_explainer_factory(predictor: Predictor) -> Explainer | None:
+    """Build a LIME explainer for ``predictor``, or None when unavailable."""
+    try:
+        from sentiment.responsible.explain import LimeExplainer
+    except ImportError:
+        logger.warning("lime is not installed; POST /api/v1/explain will report 501")
+        return None
+    return LimeExplainer(predictor)
+
+
+def _resolve_explainer(app: FastAPI) -> Explainer | None:
+    """Return an explainer bound to the predictor that is serving right now.
+
+    Rebuilt whenever the predictor identity changes, so an explanation always
+    describes the model currently answering ``/predict`` rather than one that a
+    reload replaced.
+    """
+    injected: Explainer | None = app.state.explainer
+    if injected is not None:
+        return injected
+
+    runtime: InferenceRuntime = app.state.runtime
+    predictor = runtime.predictor
+    if predictor is None:
+        return None
+
+    cached: tuple[Predictor, Explainer] | None = app.state.explainer_cache
+    if cached is not None and cached[0] is predictor:
+        return cached[1]
+
+    factory: Callable[[Predictor], Explainer | None] = app.state.explainer_factory
+    built = factory(predictor)
+    app.state.explainer_cache = (predictor, built) if built is not None else None
+    return built
+
+
 def create_app(
     predictor_factory: PredictorFactory | None = None,
     explainer: Explainer | None = None,
+    explainer_factory: Callable[[Predictor], Explainer | None] | None = None,
 ) -> FastAPI:
     """Build an isolated application instance for Uvicorn or tests."""
     settings = get_settings()
     load_predictor = predictor_factory or _default_predictor_factory
+    build_explainer = explainer_factory or _default_explainer_factory
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         runtime = InferenceRuntime(settings, load_predictor, _BOOTSTRAP_REFERENCE)
         app.state.runtime = runtime
         app.state.explainer = explainer
+        app.state.explainer_factory = build_explainer
+        app.state.explainer_cache = None
         await runtime.start()
         yield
         await runtime.close()
@@ -282,12 +325,12 @@ def create_app(
     async def explain(request: Request, payload: ExplainRequest) -> ExplainResponse:
         runtime: InferenceRuntime = request.app.state.runtime
         _validate_text(payload.text, settings, _model_version(runtime))
-        active_explainer = request.app.state.explainer
+        active_explainer = _resolve_explainer(request.app)
         if active_explainer is None:
             raise APIError(
                 501,
                 "explainer_not_available",
-                "The LIME explainer has not been installed yet.",
+                "No explainer is available for the active model.",
             )
         explanation = await asyncio.to_thread(
             active_explainer.explain, payload.text, payload.method

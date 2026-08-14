@@ -39,14 +39,64 @@ def write_parquet(df: pd.DataFrame, path: Path) -> Path:
     return path
 
 
-def ingest(split: str, output_dir: Path, dataset_name: str = "amazon_polarity") -> Path:
+VSFC_COLUMNS = ("Sentence", "Encoded_sentiment")
+
+
+def normalise_vsfc(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalise a UIT-VSFC frame to the shared ``["label", "text"]`` schema.
+
+    UIT-VSFC ships one sentence per row with a three-class encoded sentiment, so
+    there is nothing to concatenate — unlike ``amazon_polarity``, which splits a
+    review across ``title`` and ``content``. Both land on the same two columns so
+    that everything downstream stays dataset-agnostic.
+
+    Args:
+        df: Frame carrying at least ``Sentence`` and ``Encoded_sentiment``.
+
+    Returns:
+        A frame with exactly ``["label", "text"]``.
+
+    Raises:
+        ValueError: If required columns are missing.
+    """
+    missing = set(VSFC_COLUMNS) - set(df.columns)
+    if missing:
+        raise ValueError(f"missing raw columns: {sorted(missing)}")
+
+    text: pd.Series = df["Sentence"].fillna("").astype(str).str.strip()  # type: ignore[assignment]
+    return pd.DataFrame({"label": df["Encoded_sentiment"].astype("int64"), "text": text})
+
+
+NORMALISERS = {
+    "amazon_polarity": normalise,
+    "tridm/UIT-VSFC": normalise_vsfc,
+}
+
+
+def normalise_for(dataset_name: str, df: pd.DataFrame) -> pd.DataFrame:
+    """Apply the normaliser registered for ``dataset_name``.
+
+    Raises:
+        KeyError: If the dataset has no registered normaliser. Failing loudly
+            beats guessing a column layout and silently training on nonsense.
+    """
+    try:
+        normaliser = NORMALISERS[dataset_name]
+    except KeyError as exc:
+        raise KeyError(
+            f"no normaliser registered for '{dataset_name}'; "
+            f"known datasets: {sorted(NORMALISERS)}"
+        ) from exc
+    return normaliser(df)
+
+
+def ingest(split: str, output_dir: Path, dataset_name: str = "tridm/UIT-VSFC") -> Path:
     """Download one split from HuggingFace and write it as normalised Parquet."""
     from datasets import Dataset, load_dataset
 
     ds: Dataset = load_dataset(dataset_name, split=split)  # type: ignore[assignment]
     result = ds.to_pandas()
-    # When split is a str, to_pandas() always returns DataFrame — guard for type narrowing.
     if not isinstance(result, pd.DataFrame):
         raise TypeError(f"Expected DataFrame from to_pandas(), got {type(result)}")
     raw: pd.DataFrame = result
-    return write_parquet(normalise(raw), output_dir / f"{split}.parquet")
+    return write_parquet(normalise_for(dataset_name, raw), output_dir / f"{split}.parquet")

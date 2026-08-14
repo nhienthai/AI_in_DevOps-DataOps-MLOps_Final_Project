@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SENTIMENT_", env_file=".env", extra="ignore")
 
-    dataset_name: str = "amazon_polarity"
+    dataset_name: str = "tridm/UIT-VSFC"
     raw_data_dir: Path = Path("data/raw")
     processed_data_dir: Path = Path("data/processed")
     train_size: int = Field(default=200_000, gt=0)
@@ -63,6 +63,22 @@ class Settings(BaseSettings):
     def blank_reload_token_is_disabled(cls, value: object) -> object:
         """Treat an omitted or blank secret as a disabled reload endpoint."""
         return None if value == "" else value
+
+    @model_validator(mode="after")
+    def one_dataset_for_data_and_training(self) -> "Settings":
+        """Reject a configuration where the data and training layers disagree.
+
+        These were briefly two different datasets — the data layer ingesting
+        ``amazon_polarity`` while training loaded UIT-VSFC — which made the
+        quality gate guard data nobody trained on. Keeping both names is
+        tolerable; letting them differ is not.
+        """
+        if self.dataset_name != self.model_dataset_name:
+            raise ValueError(
+                "dataset_name and model_dataset_name must match: "
+                f"{self.dataset_name!r} != {self.model_dataset_name!r}"
+            )
+        return self
 
     @model_validator(mode="after")
     def label_maps_match_the_public_contract(self) -> "Settings":

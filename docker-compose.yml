@@ -61,10 +61,12 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.17.2
     command: >-
-      sh -c "pip install --no-cache-dir psycopg2-binary &&
+      sh -c "pip install --no-cache-dir psycopg2-binary prometheus-flask-exporter &&
+      mkdir -p /tmp/mlflow-metrics &&
       mlflow server --host 0.0.0.0 --port 5000
       --backend-store-uri postgresql://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/${POSTGRES_DB:-mlflow}
-      --artifacts-destination /mlartifacts --serve-artifacts"
+      --artifacts-destination /mlartifacts --serve-artifacts
+      --expose-prometheus /tmp/mlflow-metrics"
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
@@ -140,8 +142,33 @@ services:
       retries: 5
     restart: unless-stopped
 
+  trainer:
+    profiles: ["training"]
+    build:
+      context: .
+      dockerfile: Dockerfile.training
+    environment:
+      SENTIMENT_MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      SENTIMENT_LOG_LEVEL: ${SENTIMENT_LOG_LEVEL:-INFO}
+      HF_HOME: /cache/huggingface
+    volumes:
+      - ./artifacts:/app/artifacts
+      - hf-cache:/cache/huggingface
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    command:
+      - --model-type
+      - baseline
+      - --mitigation
+      - blinding
+      - --tune-trials
+      - "10"
+
 volumes:
   postgres-data:
   mlflow-artifacts:
+  hf-cache:
   prometheus-data:
   grafana-data:

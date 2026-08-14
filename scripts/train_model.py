@@ -68,6 +68,29 @@ def main():
         default=settings.mlflow_tracking_uri,
         help="MLflow tracking server URI",
     )
+    parser.add_argument(
+        "--tune-trials",
+        type=int,
+        default=0,
+        help="Optuna trials for the baseline; 0 skips the sweep",
+    )
+    parser.add_argument(
+        "--cv-splits",
+        type=int,
+        default=5,
+        help="Cross-validation folds for the baseline; 0 skips it",
+    )
+    parser.add_argument(
+        "--mitigation",
+        choices=["none", "counterfactual", "blinding"],
+        default="none",
+        help="Fairness mitigation applied to the baseline",
+    )
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="Compute and log SHAP global importance",
+    )
 
     args = parser.parse_args()
 
@@ -81,7 +104,15 @@ def main():
 
     if args.model_type == "baseline":
         out_path = os.path.join(args.output_dir, "baseline_model.joblib")
-        metrics = train_baseline_model(dataset_name=args.dataset, output_path=out_path)
+        metrics = train_baseline_model(
+            dataset_name=args.dataset,
+            output_path=out_path,
+            tune_trials=args.tune_trials,
+            cv_splits=args.cv_splits,
+            mitigation=args.mitigation,
+            explain=args.explain,
+            artifacts_dir=os.path.join(args.output_dir, "baseline"),
+        )
     else:
         out_path = os.path.join(args.output_dir, "xlm-roberta")
         metrics = train_transformer_model(
