@@ -23,12 +23,39 @@ class FakeExplainer:
         )
 
 
-def test_endpoint_is_explicitly_unavailable_until_m5_plugs_in(
-    client: TestClient,
-) -> None:
-    response = client.post("/api/v1/explain", json={"text": "Excellent battery life."})
-    assert response.status_code == 501
-    assert response.json()["error_code"] == "explainer_not_available"
+def test_endpoint_reports_501_when_no_explainer_can_be_built() -> None:
+    """A deployment without LIME installed must say so rather than 500."""
+    with TestClient(create_app(explainer_factory=lambda predictor: None)) as client:
+        response = client.post("/api/v1/explain", json={"text": "Excellent battery life."})
+        assert response.status_code == 501
+        assert response.json()["error_code"] == "explainer_not_available"
+
+
+def test_default_wiring_explains_against_the_live_model(client: TestClient) -> None:
+    """The default factory builds an explainer bound to the serving predictor."""
+    response = client.post("/api/v1/explain", json={"text": "Giáo viên dạy rất hay."})
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["method"] == "lime"
+    assert body["label"] in {"negative", "neutral", "positive"}
+    assert 0.0 <= body["score"] <= 1.0
+    assert body["attributions"]
+    assert all(isinstance(item["token"], str) for item in body["attributions"])
+
+
+def test_explainer_is_rebuilt_when_the_predictor_changes() -> None:
+    """An explanation must describe the model serving now, not one a reload replaced."""
+    built: list[object] = []
+
+    def factory(predictor: object) -> FakeExplainer:
+        built.append(predictor)
+        return FakeExplainer()
+
+    with TestClient(create_app(explainer_factory=factory)) as client:
+        client.post("/api/v1/explain", json={"text": "first"})
+        client.post("/api/v1/explain", json={"text": "second"})
+        assert len(built) == 1, "explainer should be cached while the predictor is unchanged"
 
 
 def test_injected_explainer_returns_the_public_contract() -> None:

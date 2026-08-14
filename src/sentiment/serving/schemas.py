@@ -16,6 +16,10 @@ class APIModel(BaseModel):
 class PredictRequest(APIModel):
     """One review to classify."""
 
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"text": "Giáo viên giảng bài rất dễ hiểu."}}
+    )
+
     text: str = Field(
         min_length=1,
         description="Review text to classify.",
@@ -50,15 +54,37 @@ class PredictResponse(BaseModel):
 class BatchRequest(APIModel):
     """A non-empty collection of reviews to classify."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "texts": [
+                    "Bài giảng rất dễ hiểu.",
+                    "",
+                    "Phòng học hơi nóng.",
+                ]
+            }
+        }
+    )
+
     texts: list[str] = Field(
         min_length=1,
         description="One to 64 review texts; invalid items are isolated.",
-        examples=[["Excellent build quality.", "Stopped working after one day."]],
+        examples=[["Bài giảng rất dễ hiểu.", "Tài liệu sơ sài, không có ví dụ."]],
     )
 
 
 class BatchItem(BaseModel):
     """One batch result containing exactly one prediction or error."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "index": 1,
+                "prediction": None,
+                "error": "Text must not be blank.",
+            }
+        }
+    )
 
     index: int = Field(ge=0)
     prediction: PredictResponse | None = None
@@ -128,15 +154,28 @@ class ModelInfo(BaseModel):
 class ExplainRequest(APIModel):
     """One review and the requested local explanation method."""
 
-    text: str = Field(min_length=1, examples=["The battery life is excellent."])
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "text": "Giáo viên dạy rất hay nhưng tài liệu thì sơ sài.",
+                "method": "lime",
+            }
+        }
+    )
+
+    text: str = Field(min_length=1, examples=["Giáo viên dạy rất hay nhưng tài liệu thì sơ sài."])
     method: Literal["lime"] = "lime"
 
 
 class Attribution(BaseModel):
     """One token and its signed contribution."""
 
-    token: str = Field(examples=["excellent"])
-    attribution: float = Field(examples=[0.42])
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"token": "hay", "attribution": 0.2563}}
+    )
+
+    token: str = Field(examples=["hay"])
+    attribution: float = Field(examples=[0.2563])
 
 
 class ExplainResponse(BaseModel):
@@ -146,10 +185,15 @@ class ExplainResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "method": "lime",
-                "label": "positive",
-                "score": 0.91,
-                "model_version": "12",
-                "attributions": [{"token": "excellent", "attribution": 0.42}],
+                "label": "negative",
+                "score": 0.4225,
+                "model_version": "2",
+                "attributions": [
+                    {"token": "rất", "attribution": 0.3004},
+                    {"token": "hay", "attribution": 0.2563},
+                    {"token": "nhưng", "attribution": -0.1761},
+                    {"token": "sơ", "attribution": -0.1546},
+                ],
             }
         }
     )

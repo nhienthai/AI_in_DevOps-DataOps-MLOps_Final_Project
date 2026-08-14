@@ -77,8 +77,8 @@ def test_registry_backend_uses_m2_loader_contract(
         with TestClient(create_app()) as client:
             assert client.get("/ready").status_code == 200
             assert received == {
-                "tracking_uri": "http://localhost:5000",
-                "stage": "Production",
+                "tracking_uri": get_settings().mlflow_tracking_uri,
+                "stage": get_settings().model_stage,
             }
     finally:
         get_settings.cache_clear()

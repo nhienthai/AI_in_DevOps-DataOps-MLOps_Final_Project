@@ -75,7 +75,10 @@ INPUT_LENGTH = Histogram(
     buckets=[16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192],
 )
 DRIFT_PSI = Gauge("ml_drift_psi", "Population stability index against the training reference")
-FAIRNESS_MAX_DELTA = Gauge("ml_fairness_max_delta", "Maximum EEC identity-pair score delta")
+FAIRNESS_MAX_DELTA = Gauge(
+    "ml_fairness_max_delta",
+    "Worst identity-pair score delta of the model currently serving",
+)
 INFERENCE_IN_PROGRESS = Gauge("ml_inference_in_progress", "Inference batches currently executing")
 INFERENCE_QUEUE_DEPTH = Gauge(
     "ml_inference_queue_depth", "Requests waiting for an inference worker"

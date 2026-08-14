@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from sentiment.config import Settings
 from sentiment.serving.metrics import (
+    FAIRNESS_MAX_DELTA,
     INFERENCE_IN_PROGRESS,
     INFERENCE_OVERLOADS,
     INFERENCE_QUEUE_DEPTH,
@@ -100,6 +101,7 @@ class InferenceRuntime:
             self.model_load_error = None
             stage = str(getattr(predictor, "stage", self.settings.model_stage))
             MODEL_LOADED.set(1)
+            self._publish_fairness(predictor)
             MODEL_INFO.info(
                 {
                     "version": predictor.version,
@@ -110,6 +112,18 @@ class InferenceRuntime:
             )
             MODEL_LAST_RELOAD.set(time.time())
             return True
+
+    def _publish_fairness(self, predictor: Predictor) -> None:
+        """Expose the promoted model's fairness delta as a gauge.
+
+        The number is measured at training time and travels with the run, so
+        publishing it here means the dashboard and ``FairnessRegression`` describe
+        the model that is actually serving. A model whose run carried no fairness
+        metric leaves the gauge at zero, which is what ``FairnessUnmeasured``
+        exists to notice.
+        """
+        delta = getattr(predictor, "fairness_delta", None)
+        FAIRNESS_MAX_DELTA.set(float(delta) if delta is not None else 0.0)
 
     def _release_after_timeout(self, future: asyncio.Future[list[Prediction]]) -> None:
         INFERENCE_IN_PROGRESS.dec()
