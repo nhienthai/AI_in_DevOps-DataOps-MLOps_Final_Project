@@ -12,10 +12,10 @@ three of them will bite you if you skip this.
 - [ ] A machine that has **never** run this project. Not "I ran `down -v`" — a different
       machine, or at minimum `docker system prune -a` plus a clone into a new directory.
 - [ ] The clone is of `main`, not of a feature branch.
-- [ ] **macOS only: turn off AirPlay Receiver.** System Settings → General → AirDrop &
-      Handoff. It binds `*:5000` and makes MLflow answer 403, so a healthy stack looks
-      dead. This has already cost us one debugging session.
-- [ ] Host ports free: 8000, 5000, 9090, 9093, 3000. Check with
+- [ ] **MLflow is on `localhost:5001`, not 5000.** macOS AirPlay Receiver binds `*:5000`
+      and makes MLflow answer 403, so the stack publishes 5001 instead. Demo from 5001
+      and there is nothing to turn off. This already cost us one debugging session.
+- [ ] Host ports free: 8000, 5001, 9090, 9093, 3000. Check with
       `lsof -nP -iTCP:8000 -sTCP:LISTEN` per port. A second monitoring stack on the same
       machine is the usual culprit.
 - [ ] Stopwatch. Target is 18 minutes of content.
@@ -37,7 +37,8 @@ docker compose up -d --build  # first build downloads CPU torch — several minu
 - [ ] `curl -s localhost:8000/ready` → `{"status":"ready",...}`
 - [ ] Grafana at `localhost:3000` shows the **Sentiment** folder with three dashboards
 - [ ] Prometheus at `localhost:9090` → Status → Rules shows **10** rules
-- [ ] `curl -s localhost:5000/health` → 200 *(if this is 403 on macOS, AirPlay is on)*
+- [ ] `curl -s localhost:5001/health` → 200 *(403 with `Server: AirTunes` means you are
+      on 5000 — MLflow is published on 5001)*
 - [ ] Every step of the demo script in [`PRESENTATION.md`](PRESENTATION.md) §14, in order
 - [ ] Every member speaks their own slides at least once
 
@@ -94,11 +95,11 @@ That is the intended behaviour — failing loudly beats booting Grafana with a b
 password — but it means **`cp .env.example .env` is not optional** and belongs in the very
 first line of the demo script.
 
-**4. macOS AirPlay Receiver takes port 5000.** MLflow answers `403` with
+**4. macOS AirPlay Receiver takes port 5000.** MLflow answered `403` with
 `Server: AirTunes/…` while being perfectly healthy inside the network. Checked with
 `docker compose exec api python -c "import urllib.request;
-print(urllib.request.urlopen('http://mlflow:5000/health').status)"` → 200. Turn AirPlay
-off, or publish MLflow on another port.
+print(urllib.request.urlopen('http://mlflow:5000/health').status)"` → 200. Fixed by
+publishing MLflow on `127.0.0.1:5001:5000`, so no machine setting has to change.
 
 **5. `docker compose up | tail` hides the real exit code.** A port conflict can look like
 a successful start because the pipeline reports `tail`'s status. Read the output rather

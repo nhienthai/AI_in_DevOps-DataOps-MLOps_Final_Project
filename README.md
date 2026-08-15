@@ -10,11 +10,15 @@ Prometheus, and deployed as six Docker Compose services.
 
 DDM501 — AI in Production: From Models to Systems. Final project, Topic 8.
 
-> **Status: serving a real model.** Six healthy services, a TF-IDF baseline trained on
-> UIT-VSFC and promoted to registry stage `Production` through a gate that checks
-> macro-F1, accuracy, latency **and** fairness. Held-out **macro-F1 0.7149 / accuracy
-> 0.8629**, worst identity-pair gap **0.0000** after mitigation. The XLM-RoBERTa
-> transformer is next and needs a GPU. See
+> **Status: serving the fine-tuned transformer.** Six healthy services running
+> PhoBERT-v2 on UIT-VSFC — held-out **macro-F1 0.8457 / accuracy 0.9416**, ahead of
+> the XLM-RoBERTa it replaced (0.8337 / 0.9359), which stays mounted and one
+> environment variable away. Both were fine-tuned on a Kaggle GPU and are served
+> from disk with `SENTIMENT_PREDICTOR_BACKEND=local`; see
+> [Serving the fine-tuned transformers](#serving-the-fine-tuned-transformers). The TF-IDF
+> baseline it replaced (**macro-F1 0.7149 / accuracy 0.8629**, worst identity-pair gap
+> **0.0000** after mitigation) went through the full promotion gate — macro-F1,
+> accuracy, latency **and** fairness — and remains registry version 2. See
 > [Current state](ARCHITECTURE.md#current-state) for what is and is not built.
 
 ## Architecture at a glance
@@ -43,7 +47,7 @@ Full diagrams, the component table and every technology trade-off are in
 
 ## Quickstart
 
-Requires Docker with Compose v2 and host ports 8000, 5000, 9090, 9093, 3000 free.
+Requires Docker with Compose v2 and host ports 8000, 5001, 9090, 9093, 3000 free.
 
 ```bash
 cp .env.example .env      # then set the two change-this-before-deployment passwords
@@ -71,7 +75,7 @@ prometheus     Up 20 seconds (healthy)
 |---|---|
 | API | http://localhost:8000 |
 | Swagger UI | http://localhost:8000/docs |
-| MLflow | http://localhost:5000 |
+| MLflow | http://localhost:5001 |
 | Prometheus | http://localhost:9090 |
 | Alertmanager | http://localhost:9093 |
 | Grafana | http://localhost:3000 (`admin` / `GRAFANA_ADMIN_PASSWORD`) |
@@ -279,6 +283,63 @@ Measure the deployed model's fairness over HTTP at any time:
 python scripts/run_fairness_probe.py --threshold 0.10   # exits 1 if the gate fails
 ```
 
+## Serving the fine-tuned transformers
+
+Both transformers were fine-tuned on Kaggle, not in this stack, and arrive as
+archives in `models/` that git ignores. Unpack them, then log the runs into MLflow:
+
+```bash
+python scripts/setup_local_model.py          # both bundles -> artifacts/
+python scripts/import_donated_run.py         # XLM-R run from its tracking database
+python scripts/import_donated_run.py --from-model-metadata \
+  --model-dir artifacts/phobert-sota         # PhoBERT, which arrived without one
+```
+
+| Model | Directory | accuracy | macro-F1 |
+|---|---|---:|---:|
+| **PhoBERT-v2** (served) | `artifacts/phobert-sota` (0.50 GiB) | **0.9416** | **0.8457** |
+| XLM-RoBERTa | `artifacts/xlm-roberta` (1.05 GiB) | 0.9359 | 0.8337 |
+
+Measured on the 3166-example UIT-VSFC test split, through the same input format
+the API serves. `setup_local_model.py` takes only the model root of each archive:
+the two bundles also carry training checkpoints holding `optimizer.pt` state —
+8.7 GB combined — which matter only for resuming a fine-tune.
+
+Serve, and switch between them with one variable:
+
+```bash
+SENTIMENT_PREDICTOR_BACKEND=local docker compose up -d --build api
+SENTIMENT_LOCAL_MODEL_DIR=/app/artifacts/xlm-roberta docker compose up -d api   # the other one
+```
+
+```console
+$ curl -s localhost:8000/api/v1/model/info | jq '{model_version, stage, test_macro_f1: .metrics.test_macro_f1}'
+{
+  "model_version": "local-phobert-sota",
+  "stage": "Production",
+  "test_macro_f1": 0.8457
+}
+```
+
+Three things are worth knowing about this path:
+
+- **PhoBERT is not served the raw request text.** Its notebook trains on
+  `"Chủ đề: {topic} | {cleaned sentence}"`, so a bare sentence is out of
+  distribution for it — macro-F1 drops from 0.8457 to 0.7956, below the model it
+  replaced. The HTTP contract has no topic field, so serving pins the dataset's
+  own `others` default, which measured marginally *better* than passing the true
+  topic. The transformation is declared in `serving_metadata.json` next to the
+  weights and applied by `sentiment.models.text_format.InputFormat`, so it cannot
+  drift away from the weights it belongs to.
+- **Weights are not uploaded to MLflow.** `import_donated_run.py` logs the run and
+  its metrics, then registers a version whose artifact is a JSON pointer at the
+  model directory. That gives the registry accurate lineage without pushing a
+  gigabyte through it on every deploy — but it also means
+  `SENTIMENT_PREDICTOR_BACKEND=registry` cannot serve these models. Use `local`.
+- **The donated run measured no fairness metric,** so `/model/info` reports
+  `fairness_delta: null` and the `FairnessUnmeasured` alert fires by design. Run
+  `scripts/run_fairness_probe.py` against the deployed model to get that number.
+
 ## Development
 
 ```bash
@@ -303,25 +364,26 @@ lsof -nP -iTCP:8000 -sTCP:LISTEN     # find the holder
 ```
 
 Either stop it, or change the host side of the mapping in `docker-compose.yml`
-(`"8001:8000"`). The same applies to 9090, 9093, 3000 and 5000 — a second monitoring
+(`"8001:8000"`). The same applies to 9090, 9093, 3000 and 5001 — a second monitoring
 stack on the same machine is the usual culprit, and the failure message names the port.
 Note that `docker compose up | tail` hides the real exit code, so a port conflict can
 look like a successful start; read the output rather than trusting the exit status.
 
-**MLflow returns 403 on macOS and the UI will not load.** The container is fine — macOS
-AirPlay Receiver binds `*:5000` and wins over Docker's `127.0.0.1:5000`, so every
-request is answered by AirTunes instead of MLflow.
+**MLflow is published on 5001, not 5000.** macOS AirPlay Receiver binds `*:5000` and
+wins over Docker's loopback publish, so every request is answered by AirTunes and a
+healthy MLflow returns 403. Rather than asking each developer to turn AirPlay off, the
+stack publishes `127.0.0.1:5001:5000`; the server still listens on 5000 inside the
+network, which is why `SENTIMENT_MLFLOW_TRACKING_URI` stays `http://mlflow:5000` for the
+services and `http://localhost:5001` for anything run from the host.
+
+If a URL ever answers 403 with `Server: AirTunes`, that is this conflict — you are on
+5000 by mistake:
 
 ```bash
-curl -sD - -o /dev/null http://localhost:5000/    # Server: AirTunes/... confirms it
+curl -sD - -o /dev/null http://localhost:5001/    # 200 from MLflow
 docker compose exec api python -c \
   "import urllib.request; print(urllib.request.urlopen('http://mlflow:5000/health').status)"
 ```
-
-The second command returning 200 proves MLflow is healthy and only the host port is
-taken. Fix by turning off **System Settings → General → AirDrop & Handoff → AirPlay
-Receiver**, or by publishing MLflow on another port. This one is worth checking before
-a live demo: it makes a working stack look broken.
 
 **`mlflow` unhealthy because postgres was slow to start.** `mlflow` depends on postgres
 being healthy, and `api` depends on `mlflow`. On a cold machine postgres can exceed its

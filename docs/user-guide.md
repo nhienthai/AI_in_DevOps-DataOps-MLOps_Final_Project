@@ -8,7 +8,7 @@ must not be edited casually.
 ## Deploying the stack
 
 Requires Docker with Compose v2, roughly 4 GB of free disk for images, and host ports
-8000, 5000, 9090, 9093 and 3000 available.
+8000, 5001, 9090, 9093 and 3000 available.
 
 ```bash
 cp .env.example .env      # then edit the two change-this-before-deployment passwords
@@ -39,7 +39,7 @@ prometheus     Up 20 seconds (healthy)
 |---|---|---|
 | API | http://localhost:8000 | |
 | Swagger UI | http://localhost:8000/docs | OpenAPI 3.1 at `/openapi.json` |
-| MLflow | http://localhost:5000 | postgres-backed, artifacts on a named volume |
+| MLflow | http://localhost:5001 | postgres-backed, artifacts on a named volume |
 | Prometheus | http://localhost:9090 | bound to `127.0.0.1` only |
 | Alertmanager | http://localhost:9093 | bound to `127.0.0.1` only |
 | Grafana | http://localhost:3000 | `admin` / `GRAFANA_ADMIN_PASSWORD` from `.env` |
@@ -83,7 +83,7 @@ containers share a network, not at the API.
 Promotion is by registry stage, so a rollback is a stage transition plus a reload — no
 redeploy and no image rebuild.
 
-1. Find the version you want in MLflow at http://localhost:5000, under **Models** →
+1. Find the version you want in MLflow at http://localhost:5001, under **Models** →
    `sentiment-service-xlm-roberta`. Note its version number and confirm its metrics.
 2. Transition that version to `Production`:
 

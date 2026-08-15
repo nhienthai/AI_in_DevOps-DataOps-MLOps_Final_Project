@@ -102,6 +102,15 @@ is not used as a metric label or included in API logs.
   the run logged — a `*.joblib` file loads the TF-IDF baseline, anything else is treated as
   a Hugging Face directory. Production deployment sets
   `SENTIMENT_PREDICTOR_BACKEND=registry`.
+- M2 local loading: `sentiment.models.local.load_local_predictor` serves a Hugging Face
+  directory straight from `SENTIMENT_LOCAL_MODEL_DIR`, reading version, metrics and
+  provenance from the `serving_metadata.json` written next to the weights. This is how both
+  fine-tuned transformers ship, since their weights never entered MLflow.
+- M2 input format: `serving_metadata.json` may carry a `preprocessing` block
+  (`clean_dataset_artifacts`, `template`) that `sentiment.models.text_format.InputFormat`
+  applies before tokenizing. A model trained on shaped input — PhoBERT-v2 is trained on
+  `"Chủ đề: {topic} | {cleaned}"` — must be served the same shape, so the transformation
+  travels with the weights rather than living in a training notebook.
 - M1 drift artifact: place `drift_reference.json` alongside the registered model artifact.
   Its length bins, frequencies, and positive prior are loaded with the predictor; a safe
   bootstrap reference remains available for older artifacts.

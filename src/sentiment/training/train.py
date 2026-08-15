@@ -3,7 +3,6 @@
 import json
 import logging
 import os
-import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +26,7 @@ from transformers import (  # noqa: E402
 from sentiment.config import settings  # noqa: E402
 from sentiment.data.preprocess import build_drift_reference  # noqa: E402
 from sentiment.models.baseline import BaselinePredictor  # noqa: E402
+from sentiment.models.text_format import clean_text_vietnamese  # noqa: E402,F401
 from sentiment.training.evaluate import (  # noqa: E402
     compute_metrics,
     cross_validate_baseline,
@@ -258,13 +258,10 @@ def measure_candidate_fairness(predictor: Any) -> Any:
     return probe(score)
 
 
-def clean_text_vietnamese(text: str) -> str:
-    if not isinstance(text, str):
-        return ""
-    text = re.sub(r"doubledot", ":", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bfraction\b", "/", text, flags=re.IGNORECASE)
-    text = re.sub(r"wzjwz\d+", "[ANON]", text, flags=re.IGNORECASE)
-    return text.strip()
+# Re-exported so existing training callers keep working. The implementation moved
+# to sentiment.models.text_format because serving needs the identical function:
+# a model trained on cleaned text must be served cleaned text.
+__all__ = ["clean_text_vietnamese"]
 
 
 def train_transformer_model(

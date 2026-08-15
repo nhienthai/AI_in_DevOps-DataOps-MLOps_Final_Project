@@ -243,8 +243,9 @@ explains the positive-class probability rather than attributing across all three
    `pending`
 
 **Safety rules.** Stack up and warm before you present. Have every response saved as a
-fallback slide. On macOS, turn off AirPlay Receiver first — it binds port 5000 and makes
-MLflow look dead. Never run `docker compose up --build` in front of the room.
+fallback slide. Open MLflow at `localhost:5001` — port 5000 is taken by macOS AirPlay
+Receiver, which is why the stack publishes 5001. Never run `docker compose up --build` in
+front of the room.
 
 ## 15. What we got wrong — all (1:00)
 

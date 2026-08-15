@@ -19,6 +19,19 @@ services:
       SENTIMENT_QUEUE_TIMEOUT_SECONDS: ${SENTIMENT_QUEUE_TIMEOUT_SECONDS:-1}
       SENTIMENT_RELOAD_TOKEN: ${SENTIMENT_RELOAD_TOKEN:-}
       SENTIMENT_BUILD_REVISION: ${BUILD_REVISION:-development}
+      # Both models are mounted; this picks which one serves. PhoBERT-v2 leads on
+      # the held-out test split (macro-F1 0.8457 vs 0.8337), so it is the default.
+      SENTIMENT_LOCAL_MODEL_DIR: ${SENTIMENT_LOCAL_MODEL_DIR:-/app/artifacts/phobert-sota}
+      # The rootfs is read-only and the weights are already on disk, so nothing
+      # should reach for the Hub. Offline turns a silent network stall on a slow
+      # DNS lookup into an immediate local load.
+      HF_HUB_OFFLINE: "1"
+      HF_HOME: /tmp/huggingface
+    volumes:
+      # Only used by SENTIMENT_PREDICTOR_BACKEND=local. Read-only: serving must
+      # never write back into the weights it was given.
+      - ./artifacts/phobert-sota:/app/artifacts/phobert-sota:ro
+      - ./artifacts/xlm-roberta:/app/artifacts/xlm-roberta:ro
     healthcheck:
       test:
         - CMD
@@ -38,7 +51,9 @@ services:
     cap_drop:
       - ALL
     pids_limit: 256
-    mem_limit: ${API_MEMORY_LIMIT:-2g}
+    # 4g rather than 2g: the local backend holds XLM-R base in fp32, which is
+    # ~1.1 GB resident before activations. The stub backend never gets near it.
+    mem_limit: ${API_MEMORY_LIMIT:-4g}
     cpus: ${API_CPU_LIMIT:-2.0}
     stop_grace_period: 30s
     restart: unless-stopped
@@ -68,7 +83,10 @@ services:
       --artifacts-destination /mlartifacts --serve-artifacts
       --expose-prometheus /tmp/mlflow-metrics"
     ports:
-      - "127.0.0.1:5000:5000"
+      # 5001 on the host: macOS AirPlay Receiver binds *:5000 and answers before
+      # Docker does, which makes a healthy MLflow look like a 403. Inside the
+      # network the server still listens on 5000.
+      - "127.0.0.1:5001:5000"
     volumes:
       - mlflow-artifacts:/mlartifacts
     depends_on:

@@ -62,6 +62,11 @@ def _default_predictor_factory(settings: Settings) -> Predictor:
     if settings.predictor_backend == "stub":
         return StubPredictor(max_chars=settings.max_text_length)
 
+    if settings.predictor_backend == "local":
+        from sentiment.models.local import load_local_predictor
+
+        return load_local_predictor(settings)
+
     from sentiment.models.registry import load_production_predictor
 
     return load_production_predictor(
@@ -107,6 +112,10 @@ async def _run_predictions(
         raise APIError(504, "inference_timeout", str(exc)) from exc
     except Exception as exc:
         PREDICTION_ERRORS.labels(error_type="inference_error", model_version=version).inc()
+        # The response deliberately says nothing about why, so the log is the only
+        # place the cause survives. Omitting it once cost an afternoon of guessing
+        # at a tokenizer error that never appeared anywhere.
+        logger.exception("Inference failed for model %s", version)
         raise APIError(500, "prediction_failed", "Prediction failed.") from exc
     PREDICTION_LATENCY.labels(model_version=version).observe(elapsed)
     return predictions, elapsed * 1_000.0

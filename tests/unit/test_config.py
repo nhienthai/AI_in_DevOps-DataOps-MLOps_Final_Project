@@ -1,5 +1,7 @@
 """Configuration contract tests."""
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -20,6 +22,16 @@ def test_defaults_match_the_service_contract() -> None:
     assert settings.drift_window_size == 1_000
     assert settings.predictor_backend == "stub"
     assert settings.model_dataset_name == "tridm/UIT-VSFC"
+
+
+def test_local_backend_defaults_to_the_unpacked_weights_directory() -> None:
+    settings = Settings(predictor_backend="local")
+    assert settings.local_model_dir == Path("artifacts/xlm-roberta")
+
+
+def test_unknown_predictor_backend_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        Settings(predictor_backend="huggingface-hub")
 
 
 def test_sentiment_environment_prefix_overrides_defaults(
