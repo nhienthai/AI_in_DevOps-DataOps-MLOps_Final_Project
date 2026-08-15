@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -257,6 +258,15 @@ def measure_candidate_fairness(predictor: Any) -> Any:
     return probe(score)
 
 
+def clean_text_vietnamese(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+    text = re.sub(r"doubledot", ":", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bfraction\b", "/", text, flags=re.IGNORECASE)
+    text = re.sub(r"wzjwz\d+", "[ANON]", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
 def train_transformer_model(
     model_name: str = settings.model_name,
     dataset_name: str = settings.model_dataset_name,
@@ -265,8 +275,14 @@ def train_transformer_model(
     batch_size: int = settings.batch_size,
     learning_rate: float = settings.learning_rate,
     max_length: int = settings.max_length,
+    apply_cleaning: bool = False,
+    seed: int = 42,
 ) -> Dict[str, Any]:
     """Fine-tune XLM-RoBERTa on UIT-VSFC and log experiments to MLflow."""
+    from transformers import set_seed
+
+    set_seed(seed)
+
     logger.info("Loading dataset '%s'...", dataset_name)
     ds = load_dataset(dataset_name)
 
@@ -274,8 +290,11 @@ def train_transformer_model(
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def tokenize_fn(examples):
+        texts = examples["Sentence"]
+        if apply_cleaning:
+            texts = [clean_text_vietnamese(t) for t in texts]
         return tokenizer(
-            examples["Sentence"],
+            texts,
             padding="max_length",
             truncation=True,
             max_length=max_length,
@@ -302,7 +321,7 @@ def train_transformer_model(
     logger.info("Class weights: %s", class_weights.tolist())
 
     use_fp16 = torch.cuda.is_available()
-    training_args = TrainingArguments(
+    training_args = TrainingArguments(  # type: ignore[call-arg]
         output_dir=output_dir,
         eval_strategy="epoch",
         save_strategy="epoch",
