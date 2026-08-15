@@ -239,7 +239,8 @@ prediction can always be traced back to an MLflow run.
 | Text longer than the model's token window | truncated, with `truncated: true` in the response |
 | Batch mixing valid and invalid items | per-item results, each carrying exactly one of `prediction` or `error`; HTTP 200 with 207-style semantics in the body |
 | Model not loaded | `503 model_not_ready` from `/ready` and from every prediction endpoint |
-| Inference capacity full / too slow | `503` overload, `504` timeout |
+| Inference capacity full | `429 inference_overloaded` — shed rather than queued |
+| Inference exceeded its time budget | `504 inference_timeout` |
 | Non-ASCII and emoji input | preserved through the contract; covered by `test_unicode_and_emoji_are_preserved_by_the_contract` |
 
 ## 4. Technology choices and trade-offs

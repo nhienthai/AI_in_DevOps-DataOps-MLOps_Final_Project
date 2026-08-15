@@ -61,7 +61,7 @@ Four checks, in the order that localises a fault fastest.
 ```bash
 # 1. The API is serving and a model is loaded
 curl -s localhost:8000/ready
-# {"status":"ready","model_version":"stub-0"}
+# {"status":"ready","model_version":"2"}
 
 # 2. Prometheus has actually scraped the API
 curl -s -G localhost:9090/api/v1/query --data-urlencode 'query=up{job="sentiment-api"}'
@@ -231,7 +231,7 @@ prediction endpoint returns `503 model_not_ready`. This split is intentional: li
 stays up so the container is not killed while you diagnose.
 
 **Likely causes:** no model has been promoted to `Production` in the registry; MLflow
-is unreachable or its artifact store is empty; the checkpoint's `id2label` contradicts
+is unreachable or holds no promoted version; the checkpoint's `id2label` contradicts
 the three-class serving contract and was refused at load time; a reload was attempted
 and failed with no previous model to keep.
 
@@ -243,8 +243,10 @@ import mlflow; c = mlflow.MlflowClient('http://mlflow:5000')
 print(c.get_latest_versions('sentiment-service-xlm-roberta', stages=['Production']))"
 ```
 
-An empty list from the third command means nothing has been promoted — this is the
-expected state before W2-08, when `SENTIMENT_PREDICTOR_BACKEND` is still `stub`.
+An empty list from the third command means nothing has been promoted, so the registry
+backend has nothing to load. Either promote a model with `scripts/validate_model.py`, or
+fall back to `SENTIMENT_PREDICTOR_BACKEND=stub` to get the service answering again while
+you sort the registry out.
 
 ## PredictionSkew
 

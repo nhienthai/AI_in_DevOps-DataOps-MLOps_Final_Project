@@ -6,7 +6,7 @@ Prometheus, and deployed as six Docker Compose services.
 
 [![CI Pipeline](https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/actions/workflows/ci.yml/badge.svg)](https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)
-![Coverage gate](https://img.shields.io/badge/coverage%20gate-%E2%89%A580%25-brightgreen)
+![Coverage gate](https://img.shields.io/badge/coverage-91%25%20%2F%2085%25%20gate-brightgreen)
 
 DDM501 — AI in Production: From Models to Systems. Final project, Topic 8.
 
@@ -32,7 +32,7 @@ DDM501 — AI in Production: From Models to Systems. Final project, Topic 8.
                           ┌────────▼───────┐      ┌──────────┐
                           │   prometheus   │─────▶│ grafana  │
                           └───────┬────────┘      └──────────┘
-                                  │ 8 alert rules
+                                  │ 10 alert rules
                           ┌───────▼────────┐
                           │  alertmanager  │
                           └────────────────┘
@@ -363,9 +363,14 @@ Kaggle's GPU with its own network.
 |---|---|
 | [`docs/PROBLEM.md`](docs/PROBLEM.md) | Problem statement, users, requirements, success metrics with targets |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design, data flow, technology trade-offs, what is not built yet |
+| [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Every run, what it showed, and the mistakes worth recording |
 | [`docs/FAIRNESS.md`](docs/FAIRNESS.md) | Measured bias, two mitigations, and what each one cost |
 | [`docs/ETHICS.md`](docs/ETHICS.md) | Privacy, failure modes, and uses this system refuses |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Team roles, branching, commit convention, PR checklist |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Team roles, what each member built, branching, PR checklist |
+| [`docs/deck.html`](docs/deck.html) | The defence deck — open in a browser, arrow keys to present |
+| [`docs/PRESENTATION.md`](docs/PRESENTATION.md) | Slide-by-slide plan, speaker notes and the demo script |
+| [`docs/REHEARSAL.md`](docs/REHEARSAL.md) | Clean-machine checklist and what a dry run already found |
+| [`docs/QA_PREP.md`](docs/QA_PREP.md) | Three questions and answers per member |
 | [`docs/api.md`](docs/api.md) | Endpoint reference |
 | [`docs/user-guide.md`](docs/user-guide.md) | Deployment, rollback, and a runbook per alert |
 | [`docs/TESTING_STRATEGY.md`](docs/TESTING_STRATEGY.md) | The four test types and what each catches |
