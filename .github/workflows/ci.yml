@@ -220,6 +220,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve image name
+        # Registry repository names must be lowercase, but github.repository
+        # preserves the owner/repo casing as typed on GitHub.
+        run: |
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/sentiment-api" \
+            >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -236,8 +243,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/sentiment-api:latest
-            ghcr.io/${{ github.repository }}/sentiment-api:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
           build-args: |
             BUILD_REVISION=${{ github.sha }}
           cache-from: type=gha
@@ -249,7 +256,7 @@ jobs:
         run: |
           docker run -d --name published \
             -e SENTIMENT_PREDICTOR_BACKEND=stub -p 8000:8000 \
-            ghcr.io/${{ github.repository }}/sentiment-api:${{ github.sha }}
+            "$IMAGE:${{ github.sha }}"
           for _ in $(seq 1 30); do
             if curl -fsS http://localhost:8000/ready; then
               docker rm -f published
@@ -265,7 +272,7 @@ jobs:
           {
             echo "### Published"
             echo ""
-            echo '`ghcr.io/${{ github.repository }}/sentiment-api:${{ github.sha }}`'
+            echo "\`$IMAGE:${{ github.sha }}\`"
             echo ""
             echo "Deploy with:"
             echo '```bash'
