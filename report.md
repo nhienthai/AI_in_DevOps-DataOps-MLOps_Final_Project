@@ -181,7 +181,8 @@ weighted avg     0.9419    0.9384    0.9399      3166
 │   ├── 02_eda_and_data_cleaning_uit_vsfc.ipynb        # Phân tích EDA toàn diện 16,175 mẫu
 │   ├── train-xlm-roberta.ipynb                        # Train Baseline
 │   ├── train-xlm-roberta-improved.ipynb               # Train XLM-RoBERTa Cải Tiến
-│   └── phobert-v2.ipynb                               # Train PhoBERT SOTA
+│   ├── phobert-v2.ipynb                               # Train PhoBERT SOTA
+│   └── 05_inference_phobert_v2.ipynb                  # Pipeline Inference & Batch Serving PhoBERT-v2
 ├── src/sentiment/
 │   └── training/train.py                              # Codebase training hỗ trợ CLI --apply-cleaning
 └── Google Drive Model Weights Links/
