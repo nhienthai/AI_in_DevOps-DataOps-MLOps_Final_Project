@@ -67,13 +67,14 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        # Derived from requirements.txt rather than hand-listed, so a new
-        # runtime dependency can never be missing here.
+        # Installed from requirements-dev.txt rather than hand-listed. Pinning mypy
+        # and the stubs in two places is how CI ends up stricter than `make
+        # typecheck`, which is exactly the drift that let a Hashable narrowing
+        # through review and failed here instead.
         run: |
           python -m pip install --upgrade pip
           pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements.txt
-          pip install mypy==1.8.0 types-requests pandas-stubs==2.3.3.260113
+          pip install -r requirements-dev.txt
           pip install -e .
 
       - name: Run mypy

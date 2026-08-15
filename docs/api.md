@@ -61,9 +61,24 @@ active. This operations endpoint should not be exposed outside the trusted contr
 
 ### `POST /api/v1/explain`
 
-Accepts `{"text": "...", "method": "lime"}`. M3 owns this HTTP contract; M5 supplies the
-LIME implementation through `sentiment.serving.predictor.Explainer`. Until an explainer is
-installed, the endpoint returns typed status `501 explainer_not_available`.
+Accepts `{"text": "...", "method": "lime"}` and returns token attributions for the model
+currently serving. The explainer is built on demand from the active predictor and rebuilt
+whenever a reload replaces it, so an explanation never describes a model that is no longer
+answering `/predict`.
+
+The response carries the predicted `label`, the positive-class `score`, the
+`model_version`, and an `attributions` list of `{token, attribution}` — signed, so a
+negative value means the token pushed the prediction away from positive.
+
+Returns `501 explainer_not_available` only when no explainer can be built: a deployment
+without `lime` installed, or one with no model loaded.
+
+Note the scope of the explanation: because the `Predictor` protocol exposes a single
+positive-class `score` rather than the full three-class distribution, LIME explains *the
+positive-class probability* rather than attributing across all three classes.
+
+Global SHAP feature importance is not served here — it describes the model rather than a
+request, and is logged as an MLflow artifact on the training run.
 
 ## Error contract
 
@@ -83,13 +98,18 @@ is not used as a metric label or included in API logs.
 ## Integration contracts for other owners
 
 - M2 registry loading: `sentiment.models.registry.load_production_predictor` downloads the
-  promoted Hugging Face artifact and attaches its MLflow metrics and provenance. Production
-  deployment sets `SENTIMENT_PREDICTOR_BACKEND=registry`.
+  promoted artifact and attaches its MLflow metrics and provenance. It dispatches on what
+  the run logged — a `*.joblib` file loads the TF-IDF baseline, anything else is treated as
+  a Hugging Face directory. Production deployment sets
+  `SENTIMENT_PREDICTOR_BACKEND=registry`.
 - M1 drift artifact: place `drift_reference.json` alongside the registered model artifact.
   Its length bins, frequencies, and positive prior are loaded with the predictor; a safe
   bootstrap reference remains available for older artifacts.
-- M5 explanation: inject an object satisfying `sentiment.serving.predictor.Explainer` when
-  constructing the app.
+- M5 explanation: an explainer is built automatically from the active predictor. Passing
+  `explainer=` or `explainer_factory=` to `create_app` overrides it, which is what the
+  tests do.
+- Fairness: the promoted model's `fairness_max_delta` metric is published as the
+  `ml_fairness_max_delta` gauge at load time, which is what `FairnessRegression` alerts on.
 - M4 monitoring: provide the configuration mounted from `prometheus/`, `alertmanager/`, and
   `grafana/` by `docker-compose.yml`.
 

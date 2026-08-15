@@ -5,31 +5,34 @@ four; more usefully, each catches a class of failure the others cannot.
 
 | Type | Directory | Question it answers | Count |
 |---|---|---|---|
-| Unit | `tests/unit/` | Does this function do what its docstring says, in isolation? | 35 |
-| Data quality | `tests/data/` | Would bad data get through the gate and into training? | 8 |
-| Model | `tests/model/` | Does the model satisfy the contract the API depends on? | 10 |
-| Integration | `tests/integration/` | Does the assembled HTTP surface behave, end to end? | 27 |
+| Unit | `tests/unit/` | Does this function do what its docstring says, in isolation? | 47 |
+| Data quality | `tests/data/` | Would bad data get through the gate and into training? | 21 |
+| Model | `tests/model/` | Does the model satisfy its contract, and is it any good? | 30 |
+| Responsible AI | `tests/responsible/` | Do the fairness and explainability instruments measure what they claim? | 32 |
+| Integration | `tests/integration/` | Does the assembled HTTP surface behave, end to end? | 29 |
 
-80 tests in total.
+**159 tests**: 147 run on every push, 8 are `slow`, and 4 need a live stack.
 
 ## Running them
 
 ```bash
-make test    # unit + data + model + in-process integration, with the coverage gate
-make smoke   # only the tests that need a live Docker Compose stack
+make test     # 147 tests, with the coverage gate
+make smoke    # the 4 that need a live Docker Compose stack
+pytest -m slow  # the 8 that download the dataset or a checkpoint
 ```
 
 `make test` runs `pytest -m "not slow and not integration"`. `make smoke` runs
 `pytest tests/integration -m integration --no-cov` and requires
-`docker compose up -d` first.
+`docker compose up -d` first. The nightly workflow runs the `slow` set.
 
-Two markers are declared in `pyproject.toml` under `--strict-markers`, so a typo in a
+Both markers are declared in `pyproject.toml` under `--strict-markers`, so a typo in a
 marker name fails the run rather than silently selecting nothing:
 
 - `integration` — needs a live stack. Applied module-wide in
   `tests/integration/test_stack_smoke.py`.
-- `slow` — loads or trains a large model. **Declared but not yet used by any test.**
-  The nightly workflow that would run these is W2-11, still open.
+- `slow` — downloads the corpus or a checkpoint. Applied module-wide in
+  `tests/model/test_model_slow.py`, and run by
+  [`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml).
 
 ## Unit tests
 
@@ -97,29 +100,60 @@ reachable over the published port, that Prometheus has scraped it
 
 ## Coverage
 
-The gate is `fail_under = 80` in `pyproject.toml`, on from the first commit so it
+**91%**, against a `fail_under = 85` gate that has been on since the first commit so it
 cannot silently rot.
 
-**Read the scope before quoting the number.** `[tool.coverage.run] omit` currently
-excludes `src/sentiment/data/*`, `src/sentiment/models/*`, `src/sentiment/training/*`
-and `src/sentiment/responsible/*`. Coverage therefore measures the serving layer plus
-`config.py` — not the whole package. Tests for the excluded modules do exist and do
-run; their lines are simply not counted.
+**Read the scope, not just the number.** `[tool.coverage.run] omit` excludes exactly two
+modules, and only because they cannot be exercised honestly in CI:
 
-That is defensible for the training code, which needs a GPU and a real dataset to
-exercise honestly, and not defensible for `data/` and `models/`, which are already
-tested. Narrowing the omit list to `training/*` is tracked as part of W3-12.
+- `models/transformer.py` — needs a real checkpoint and a GPU.
+- `training/train.py` — needs the full corpus and a live MLflow server.
+
+Everything else is measured: `data/`, `models/baseline.py`, `models/registry.py`,
+`responsible/`, `training/evaluate.py`, `training/tune.py` and all of `serving/`.
+
+This was not always true. The omit list previously also excluded `data/*`, `models/*`,
+`training/*` and `responsible/*`, so the reported figure described the serving layer
+alone — a real number measured over a quarter of the package. It was narrowed as part of
+W3-12, which is why the count of measured statements roughly quadrupled while the
+percentage barely moved.
+
+The two omitted modules are still covered by behaviour: the `slow` set trains a real
+model through `train.py`'s helpers and loads a real transformer checkpoint. Those lines
+are exercised nightly; they are simply not counted on every push.
+
+## Responsible AI tests
+
+`tests/responsible/` tests the *instruments*, which is easy to skip and the reason
+fairness work is often unfalsifiable. A probe that always returns zero would look like a
+fair model.
+
+- **The probe detects known bias.** A deliberately gendered scorer must produce a gap on
+  the `gender` dimension and **zero** on the others; a constant scorer must produce zero
+  everywhere. Both are asserted.
+- **Only same-dimension groups are compared** — a gender term against a seniority term
+  would be a meaningless pair.
+- **Blinding makes an identity pair byte-identical**, which is why the delta is exactly
+  zero rather than approximately zero.
+- **Longest-term-first substitution**, so replacing `thầy` cannot corrupt
+  `thầy người hà nội`.
+- **LIME is deterministic** for the same input, and its label agrees with the predictor's.
+- **SHAP shape normalisation**, including the three-dimensional multiclass array that
+  silently reduces along the wrong axis if handled naively.
+- **The report's arithmetic**, including that it describes the *best* variant rather than
+  the last, and that a mitigation which failed is still reported.
 
 ## What is not tested yet
 
-- No fairness test, because `responsible/fairness.py` is a stub. The design makes
-  fairness a *gate* rather than a report — a promotion rule (W2-06), a failing test
-  (W2-09) and an alert (W3-06) — and none of those three exist yet.
-- No transformer behaviour test on a real checkpoint (known-positive and
-  known-negative cases, calibration bounds). This is what the `slow` marker and the
-  nightly workflow are for.
-- No load test, so the alert thresholds in `prometheus/alerts/` have not been observed
-  firing under traffic (W3-04).
+- **No transformer behaviour on a fine-tuned checkpoint.** The `slow` set loads
+  `xlm-roberta-base` and asserts the serving contract, but its head is untrained, so
+  accuracy claims about the transformer are untested because no such model exists yet.
+- **`HighLatencyP95` has never been observed firing.** The baseline answers in 0.42 ms,
+  so `load_test.py --scenario burst` cannot push p95 past the 500 ms threshold. The rule
+  is verified by inspection only; `DriftDetected` was verified for real.
+- **No test asserts the drift reference travels with the model.** Serving falls back to a
+  bootstrap reference when the artifact is missing, and nothing fails if it does — which
+  is exactly how a permanently drifting signal goes unnoticed.
 
 ## See also
 

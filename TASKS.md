@@ -6,7 +6,8 @@ Task board for the DDM501 Final Project. One line per assignable unit of work.
 - **Design rationale** for everything lives in [`docs/superpowers/specs/2026-08-09-sentiment-service-design.md`](docs/superpowers/specs/2026-08-09-sentiment-service-design.md) — the `Spec` column points at the section.
 - Weeks 2-4 are listed at task granularity here; their step-by-step plans get written at the start of each week.
 
-**Status:** `TODO` · `WIP` · `REVIEW` (PR open) · `DONE` (merged, CI green)
+**Status:** `TODO` · `WIP` · `BLOCKED` (waiting on something outside this task) ·
+`REVIEW` (PR open) · `DONE` (merged, CI green)
 
 **Last audited:** 2026-08-14, against a live stack rather than by reading the table.
 
@@ -16,38 +17,36 @@ Everything marked `DONE` below has been exercised: the suite is **147 fast tests
 loading with real data, ten alert rules parsed, and a model promoted through the gate
 and served from the registry.
 
-Two caveats, stated rather than buried:
+The work is merged: `origin/main` is at `3388536` (PR #6). One caveat remains —
+**CI-green on `main` cannot be confirmed from this machine**, because the `gh` CLI is not
+installed. Check the Actions tab before treating any row as fully `DONE` by the
+definition in `CONTRIBUTING.md`.
 
-- **Nothing here is committed yet.** `DONE` means "working and verified locally", not
-  "merged". CI-green on `main` cannot be confirmed from here — the `gh` CLI is not
-  installed.
-- The local `main` ref is stale at `95c86f4` (PR #2), four commits behind
-  `origin/main` at `c9b519e`. Fast-forward before branching.
+One CI failure has already been through this loop and is fixed in `add5f31`: a
+`dict[Hashable, int]` narrowing in `data/validate.py` that the pinned `mypy==1.8.0` could
+not see but a newer toolchain could. See **Toolchain drift** at the end of this file for what was actually wrong and how it is
+now prevented.
 
 ## Owners
 
-Fill in real names before the first PR — `CONTRIBUTING.md` and the ±20% individual
-contribution adjustment both depend on this table.
+| ID | Name | Git identity | Area | Owns |
+|---|---|---|---|---|
+| M1 | Lý Minh Thông | `thong312` | Data & Features | `src/sentiment/data/`, `tests/data/` |
+| M2 | Dương Thành Duy | `dtduy77` | Training & Experiments | `src/sentiment/models/`, `src/sentiment/training/`, `scripts/train_model.py`, `scripts/validate_model.py`, `scripts/evaluate_model.py`, `notebooks/`, `tests/model/` |
+| M3 | Bùi Vân Sơn | `sontv6666` | Serving & Containers | `src/sentiment/serving/`, `Dockerfile`, `docker-compose.yml` |
+| M4 | Lê Công Huỳnh | `HuynhLC` | Monitoring & CI/CD | `prometheus/`, `grafana/`, `alertmanager/`, `scripts/load_test.py`, `.github/workflows/`, `tests/integration/` |
+| M5 | Thái Bình Nhiên | `Nhien Thai` | Responsible AI & Docs | `src/sentiment/responsible/`, `scripts/run_fairness_probe.py`, `docs/`, `README.md`, `ARCHITECTURE.md` |
 
-| ID | Name | Area | Owns |
-|---|---|---|---|
-| M1 | `thong312` — *(confirm full name)* | Data & Features | `src/sentiment/data/`, `tests/data/` |
-| M2 | `dtduy77` — *(confirm full name)* | Training & Experiments | `src/sentiment/models/`, `src/sentiment/training/`, `scripts/train_model.py`, `scripts/validate_model.py`, `scripts/evaluate_model.py`, `notebooks/`, `tests/model/` |
-| M3 | Son TV | Serving & Containers | `src/sentiment/serving/`, `Dockerfile`, `docker-compose.yml` |
-| M4 | Lê Công Huỳnh | Monitoring & CI/CD | `prometheus/`, `grafana/`, `alertmanager/`, `scripts/load_test.py`, `.github/workflows/`, `tests/integration/` |
-| M5 | Nhien Thai | Responsible AI & Docs | `src/sentiment/responsible/`, `scripts/run_fairness_probe.py`, `docs/`, `README.md`, `ARCHITECTURE.md` |
-
-M1, M2 and M5 were filled in from git history — `thong312` authored the three
-`src/sentiment/data/` commits, `dtduy77` authored the training pipeline, and
-`Nhien Thai` owns the docs commits. Replace the two git handles with real names
-before `CONTRIBUTING.md` is written.
+The git identity column is there so a grader can map a commit to a person without
+guessing. Each mapping is unambiguous from the commit email:
+`lyminhthong312@`, `duythduong.2003@`, `sontv6666@`, `huynhlc1281@`, `thaibinhnhien@`.
 
 Directory ownership is disjoint on purpose: it keeps merge conflicts rare and makes
 the git history evidence of who did what, without anyone having to argue for it.
 
 ## Working agreement
 
-- Branch: `<initials>/<short-description>` — e.g. `nt/data-quality-gate`.
+- Branch: `<initials>/<short-description>` — `lmt` Thông, `dtd` Duy, `bvs` Sơn, `lch` Huỳnh, `tbn` Nhiên.
 - Commits: Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`, `docs:`, `ci:`).
 - Every PR: tests pass, coverage ≥ 80%, `make lint` and `make typecheck` clean.
 - Every member reviews at least one PR per week **outside** their own area.
@@ -92,7 +91,7 @@ probability, or to add a `probabilities` map and leave `score` alone.
 | ID | Task | Owner | Depends on | Plan | Status |
 |---|---|---|---|---|---|
 | W1-01 | Scaffold: `pyproject.toml`, `requirements*.txt`, `.flake8`, `Makefile`, `.env.example`, `conftest.py`, `config.py` + tests | M3 | — | Task 1 | DONE |
-| W1-02 | Data ingestion: `amazon_polarity` → normalised Parquet | M1 | W1-01 | Task 2 | DONE |
+| W1-02 | Data ingestion: ~~`amazon_polarity`~~ **`tridm/UIT-VSFC`** → normalised Parquet | M1 | W1-01 | Task 2 | DONE |
 | W1-03 | Data quality gate: schema, empties, duplicates, label balance — **fails the run** | M1 | W1-02 | Task 3 | DONE |
 | W1-04 | Splits + drift reference (seeded, stratified, logged as an artifact) | M1 | W1-03 | Task 4 | DONE |
 | W1-05 | `Predictor` protocol + deterministic `StubPredictor` | M3 | W1-01 | Task 5 | DONE |
@@ -102,17 +101,16 @@ probability, or to add a `probabilities` map and leave `score` alone.
 | W1-09 | `Dockerfile` — multi-stage, non-root, `HEALTHCHECK` on `/ready` | M3 | W1-08 | Task 9 | DONE |
 | W1-10 | `docker-compose.yml` (6 services, health checks) + `prometheus/` + `grafana/` + `alertmanager/` + smoke test | M4 | W1-09 | Task 10 | DONE |
 | W1-11 | CI: lint / type-check → test matrix → container → `ci-status` | M4 | W1-10 | Task 11 | DONE |
-| W1-12 | `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/user-guide.md`, `docs/TESTING_STRATEGY.md` | M5 | W1-10 | Task 12 | WIP |
+| W1-12 | `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/user-guide.md`, `docs/TESTING_STRATEGY.md` | M5 | W1-10 | Task 12 | DONE |
 
-**W1-12: all five files are written; the task stays `WIP` until it is merged.** Plan
-Task 12 was followed with four deliberate deviations, recorded here because the plan
-itself is wrong on these points:
+**W1-12 is merged.** Plan Task 12 was followed with four deliberate deviations, recorded
+here because the plan itself is wrong on these points:
 
 1. **Task 12 has no step for `docs/TESTING_STRATEGY.md`** even though it lists the file.
-   Written anyway, covering the four test types, the 80 tests, and the coverage scope.
+   Written anyway, covering the five test categories, all 159 tests, and the coverage scope.
 2. **Step 5's anchor check uses `#[a-z]*`, which cannot match `highlatencyp95`** — the
    digits truncate it to `highlatencyp`, and it then passes only by substring accident.
-   Use `#[a-z0-9]*`. All eight anchors verified with the corrected pattern.
+   Use `#[a-z0-9]*`. All ten anchors verified with the corrected pattern.
 3. **Step 2's "port spec §2 verbatim" would have put false claims in a graded file.**
    Spec §2.4 justifies DistilBERT for a 200 ms CPU budget and §1.6 declares English
    binary sentiment in scope; the code serves three-class Vietnamese on XLM-RoBERTa.
@@ -139,10 +137,11 @@ Verified live on 2026-08-13 by bringing the stack up on a machine with Docker 29
 - [x] Required files exist: `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `.github/workflows/`
 - [x] **Every team member has at least one commit** — five distinct authors on `origin/main`
 
-One caveat on the first box: host ports 9090 and 3000 were held by another Compose
-project on the test machine, so `prometheus` and `grafana` were published on 19090 and
-13000 for the check. The service definitions and provisioning are unaffected; on a
-machine with those ports free the documented URLs are correct.
+One caveat on the first box: the verification machine had ports 9090, 3000 and 5000
+occupied by other software, so those three services were published elsewhere for the
+check. The service definitions and provisioning are unaffected. Port 5000 in particular
+is worth knowing about before a demo — see the AirPlay entry in
+[`docs/REHEARSAL.md`](docs/REHEARSAL.md).
 
 ---
 
@@ -163,7 +162,7 @@ machine with those ports free the documented URLs are correct.
 | W2-09 | Model behaviour tests: known-positive/negative, calibration bounds, latency budget | M2 | W2-08 | §4.1 | DONE |
 | W2-10 | Add `training` profile to compose; add MLflow scrape target | M4 | W2-04 | §3.4 | DONE |
 | W2-11 | Nightly workflow for `@pytest.mark.slow` transformer tests | M4 | W2-09 | §4.3 | DONE |
-| W2-12 | Record baseline-vs-transformer comparison in `docs/` (the experiment story) | M5 | W2-05 | §3.2 | DONE |
+| W2-12 | Record baseline-vs-transformer comparison in `docs/` (the experiment story) | M5 | W2-05 | §3.2 | BLOCKED |
 
 **How the Week 2 rows closed:**
 
@@ -188,6 +187,13 @@ machine with those ports free the documented URLs are correct.
 **W2-08 was the payoff of the walking skeleton, and it paid.** Serving a real model was
 a configuration change plus a loader that dispatches on the artifact type — the HTTP
 contract, the metrics and the tests did not move.
+
+**W2-12 is `BLOCKED`, not done.** It asks for a baseline-*vs-transformer* comparison, and
+no transformer has been trained, so the comparison has nothing to compare. It was briefly
+marked `DONE` in a bulk status pass — an error, and exactly the kind this board is
+supposed to prevent. What exists is a comparison of three *baseline* variants in
+[`docs/FAIRNESS.md`](docs/FAIRNESS.md); that is W3-08, not this. Unblocks the moment a
+fine-tuned checkpoint exists: the numbers to compare are already logged per run.
 
 ### Week 2 gate
 
@@ -227,8 +233,8 @@ not worth its latency budget.
 
 | ID | Task | Owner | Depends on | Spec | Status |
 |---|---|---|---|---|---|
-| W3-01 | Import Lab 4's `system_dashboard.json`, adapt to this service | M4 | W2-08 | §3.5 | DONE |
-| W3-02 | Import Lab 4's `ml_dashboard.json`; add confidence, class-skew, drift panels | M4 | W2-08 | §3.5 | DONE |
+| W3-01 | ~~Import Lab 4's~~ **Write** `system_dashboard.json` for this service | M4 | W2-08 | §3.5 | DONE |
+| W3-02 | ~~Import Lab 4's~~ **Write** `ml_dashboard.json`; confidence, class-skew, drift panels | M4 | W2-08 | §3.5 | DONE |
 | W3-03 | New Fairness & Explainability dashboard | M4 | W3-05 | §3.5 | DONE |
 | W3-04 | `scripts/load_test.py` — generate traffic so panels and alerts have data | M4 | W3-01 | §3.5 | DONE |
 | W3-05 | EEC fairness probe over HTTP; export `ml_fairness_max_delta` | M5 | W2-08 | §5.1 | DONE |
@@ -269,15 +275,15 @@ presentation grade and rehearsal time is what protects it.
 | ID | Task | Owner | Depends on | Status |
 |---|---|---|---|---|
 | W4-01 | ~~Replace `github.com/OWNER` in every `runbook_url` with the real repo~~ — resolved to `nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project` when the project moved to the repository root | M4 | — | DONE |
-| W4-02 | README polish: badges, quickstart, `curl` examples with real output, troubleshooting | M5 | — | WIP |
-| W4-03 | `ARCHITECTURE.md` final pass; diagrams match what actually runs | M5 | — | WIP |
-| W4-04 | `CONTRIBUTING.md` with real names and per-member contribution summary | M5 | — | WIP |
+| W4-02 | README polish: badges, quickstart, `curl` examples with real output, troubleshooting | M5 | — | DONE |
+| W4-03 | `ARCHITECTURE.md` final pass; diagrams match what actually runs | M5 | — | DONE |
+| W4-04 | `CONTRIBUTING.md` with real names and per-member contribution summary | M5 | — | REVIEW |
 | W4-05 | OpenAPI examples on every schema; `docs/api.md` cross-check | M3 | — | DONE |
-| W4-06 | Slide deck (15-20 min): problem → architecture → deep dive → responsible AI → demo | all | — | TODO |
+| W4-06 | Slide deck (15-20 min): problem → architecture → deep dive → responsible AI → demo | all | — | WIP |
 | W4-07 | **Rehearsal 1**: clean `git clone` on a machine that has never run this | all | W4-01..05 | TODO |
 | W4-08 | Fix everything rehearsal 1 broke | all | W4-07 | TODO |
 | W4-09 | **Rehearsal 2**: clean clone again, timed, every member speaks | all | W4-08 | TODO |
-| W4-10 | Q&A prep: each member writes 3 likely questions on their own area and answers them | all | W4-09 | TODO |
+| W4-10 | Q&A prep: each member writes 3 likely questions on their own area and answers them | all | W4-09 | REVIEW |
 
 **W4-02 and W4-03 are `WIP` only because nothing is committed.** Their substance is
 done: the README carries `curl` output captured from the live stack serving the
@@ -329,3 +335,35 @@ Status of each, checked 2026-08-14:
 | Uneven contribution | One person builds everything | Disjoint directory ownership; cross-area PR review each week |
 | DistilBERT too slow on CPU | Discovered in Week 4 | Latency budget is a test from W2-09; baseline model is always a fallback |
 | Dataset download blocks CI | 3.6M rows fetched on every run | Subsample is seeded and cached; CI uses fixtures, not the real download |
+
+---
+
+## Toolchain drift — closed
+
+A CI failure that `make typecheck` could not reproduce, worth recording because the cause
+was structural rather than a coding mistake.
+
+`data/validate.py` narrowed `value_counts().to_dict()` with `int(label)`. Under
+`pandas-stubs` that mapping is typed `dict[Hashable, int]`, and `Hashable` cannot be
+passed to `int()`. CI caught it; local `make typecheck` did not.
+
+**The cause was two places pinning the same tools.** The CI workflow hand-listed
+`mypy==1.8.0 types-requests pandas-stubs==2.3.3.260113`, while `requirements-dev.txt`
+pinned a different stubs version. CI was therefore permanently stricter than the command
+the contributing guide tells people to run — so a type error could pass review and fail
+the build, which is exactly what happened.
+
+Closed three ways:
+
+1. `requirements-dev.txt` pins `pandas-stubs==2.3.3.260113` and
+   `types-requests==2.32.0.20241016`, matching what CI was using.
+2. The CI type-check job now installs `-r requirements-dev.txt` instead of hand-listing,
+   so the two cannot diverge again.
+3. Verified by reproduction: the old pattern fails and the new one passes under
+   mypy 2.3.0 + pandas 3.0.5, and the whole tree passes under the pinned
+   mypy 1.8.0 + pandas-stubs 2.3.3.
+
+**The mypy pin was deliberately not bumped.** mypy 1.14 surfaces six further errors in
+`data/` and `training/`, and all six are `pandas-stubs` imprecision — it types
+`.fillna("").astype(str)` as `Series[bool]`. Bumping would buy six `type: ignore` comments
+that document nothing. Revisit when the stubs improve.

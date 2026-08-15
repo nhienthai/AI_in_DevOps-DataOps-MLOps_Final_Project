@@ -17,6 +17,7 @@ data/interim/
 *.pt
 *.bin
 *.onnx
+models/
 *.zip
 *.db
 artifacts/
