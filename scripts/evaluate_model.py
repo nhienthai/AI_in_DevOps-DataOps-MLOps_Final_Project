@@ -11,23 +11,19 @@ Usage on Kaggle:
         --output-csv ./artifacts/eval_results.csv
 """
 
-import os
-import sys
 import argparse
-
-# Add project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import os
+from collections import Counter
 
 import numpy as np
 import pandas as pd
 import torch
-from collections import Counter
 from datasets import load_dataset
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from src.sentiment.config import settings
+from sentiment.config import settings
 
-LABEL_MAP = settings.label_map          # {0: "NEGATIVE", 1: "POSITIVE", 2: "NEUTRAL"}
+LABEL_MAP = settings.label_map
 LABEL_NAMES = [LABEL_MAP[i] for i in sorted(LABEL_MAP.keys())]
 
 
@@ -45,8 +41,11 @@ def predict_batch(texts, tokenizer, model, device, max_length=128, batch_size=32
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
         enc = tokenizer(
-            batch, padding=True, truncation=True,
-            max_length=max_length, return_tensors="pt",
+            batch,
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
         ).to(device)
         with torch.no_grad():
             logits = model(**enc).logits
@@ -59,6 +58,7 @@ def predict_batch(texts, tokenizer, model, device, max_length=128, batch_size=32
 
 def print_confusion_matrix(y_true, y_pred, label_names):
     from sklearn.metrics import confusion_matrix
+
     cm = confusion_matrix(y_true, y_pred)
     col_w = max(len(n) for n in label_names) + 2
     print("\n📊 Confusion Matrix (rows=Actual, cols=Predicted):")
@@ -71,25 +71,31 @@ def print_confusion_matrix(y_true, y_pred, label_names):
 
 def print_classification_report(y_true, y_pred, label_names):
     from sklearn.metrics import classification_report
+
     print("\n📈 Classification Report:")
     print(classification_report(y_true, y_pred, target_names=label_names, digits=4))
 
 
 def show_misclassified(texts, y_true, y_pred, probs, label_names, n=20):
-    wrong = [(i, texts[i], y_true[i], y_pred[i], probs[i])
-             for i in range(len(texts)) if y_true[i] != y_pred[i]]
+    wrong = [
+        (i, texts[i], y_true[i], y_pred[i], probs[i])
+        for i in range(len(texts))
+        if y_true[i] != y_pred[i]
+    ]
     print(f"\n❌ Misclassified ({min(n, len(wrong))} / {len(wrong)} total errors):")
     print("=" * 90)
     for rank, (_, text, true, pred, prob) in enumerate(wrong[:n], 1):
-        print(f"#{rank:3d} | Actual: {label_names[true]:<10} | Predicted: {label_names[pred]:<10} | Conf: {max(prob):.2%}")
+        print(
+            f"#{rank:3d} | Actual: {label_names[true]:<10} | "
+            f"Predicted: {label_names[pred]:<10} | Conf: {max(prob):.2%}"
+        )
         print(f"      Text: {text[:120]}")
         print(f"      Probs: {' | '.join(f'{label_names[j]}={p:.2%}' for j, p in enumerate(prob))}")
         print()
 
 
 def show_correct_samples(texts, y_true, y_pred, probs, label_names, n=10):
-    correct = [(texts[i], y_true[i], probs[i])
-               for i in range(len(texts)) if y_true[i] == y_pred[i]]
+    correct = [(texts[i], y_true[i], probs[i]) for i in range(len(texts)) if y_true[i] == y_pred[i]]
     print(f"\n✅ Correct Predictions (first {n}):")
     print("=" * 90)
     for rank, (text, label, prob) in enumerate(correct[:n], 1):
@@ -119,10 +125,12 @@ def save_csv(texts, y_true, y_pred, probs, label_names, output_csv: str):
     return df
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Detailed Evaluation for Sentiment Model on UIT-VSFC")
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Detailed Evaluation for Sentiment Model on UIT-VSFC"
+    )
     parser.add_argument("--model-path", default="./artifacts/xlm-roberta")
-    parser.add_argument("--dataset", default=settings.dataset_name)
+    parser.add_argument("--dataset", default=settings.model_dataset_name)
     parser.add_argument("--split", default="test", choices=["test", "validation"])
     parser.add_argument("--max-length", type=int, default=settings.max_length)
     parser.add_argument("--batch-size", type=int, default=32)

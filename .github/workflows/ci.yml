@@ -1,0 +1,296 @@
+# =============================================================================
+# CI Pipeline for Sentiment Service
+# DDM501 - Final Project
+#
+#   lint ─┐
+#         ├─> test (3.10, 3.11) ─> container (build, scan, smoke) ─> ci-status
+#   type ─┘
+#
+# Lint and type checks finish in seconds and stop a bad commit before anyone
+# pays for a Docker build.
+# =============================================================================
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop, sontv/m3-serving]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_DEFAULT: "3.10"
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install linters
+        # Pinned to the same versions as requirements-dev.txt: an unpinned
+        # release can turn the build red with no code change.
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8==7.0.0 black==23.12.1 isort==5.13.2
+
+      - name: Run flake8
+        run: flake8 src/ tests/ scripts/
+
+      - name: Check black formatting
+        run: black --check --diff src/ tests/ scripts/
+
+      - name: Check import sorting
+        run: isort --check-only --diff src/ tests/ scripts/
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+
+      - name: Install dependencies
+        # Installed from requirements-dev.txt rather than hand-listed. Pinning mypy
+        # and the stubs in two places is how CI ends up stricter than `make
+        # typecheck`, which is exactly the drift that let a Hashable narrowing
+        # through review and failed here instead.
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Run mypy
+        run: mypy src/ scripts/ --ignore-missing-imports
+
+  test:
+    name: Run Tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: [lint, type-check]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-serving.txt
+            requirements-training.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            -m "not slow and not integration" \
+            --cov=sentiment \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=80 \
+            --junitxml=junit.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-py${{ matrix.python-version }}
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: junit.xml
+          retention-days: 14
+
+  container:
+    name: Build, Scan, Smoke
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: sentiment-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sentiment-api:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Generate CycloneDX SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sentiment-api:ci
+          format: cyclonedx
+          output: sentiment-api-sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: sentiment-api-sbom
+          path: sentiment-api-sbom.cdx.json
+          retention-days: 30
+
+      - name: Start the stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+
+      - name: Wait for the API to become ready
+        # /ready, not /health: a container that is up but serving 503 because no
+        # model loaded is still a broken release.
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/ready; then exit 0; fi
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+
+      - name: Smoke test
+        run: |
+          pip install httpx pytest
+          pytest tests/integration/test_stack_smoke.py -v
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose --env-file .env.example logs
+
+  deploy:
+    name: Publish image
+    runs-on: ubuntu-latest
+    needs: [container]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve image name
+        # Registry repository names must be lowercase, but github.repository
+        # preserves the owner/repo casing as typed on GitHub.
+        run: |
+          echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/sentiment-api" \
+            >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: |
+            BUILD_REVISION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the published image runs
+        # Pull what was actually pushed rather than trusting the local layer cache,
+        # so a broken publish fails here instead of on someone else's machine.
+        run: |
+          docker run -d --name published \
+            -e SENTIMENT_PREDICTOR_BACKEND=stub -p 8000:8000 \
+            "$IMAGE:${{ github.sha }}"
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/ready; then
+              docker rm -f published
+              exit 0
+            fi
+            sleep 3
+          done
+          docker logs published
+          exit 1
+
+      - name: Deployment summary
+        run: |
+          {
+            echo "### Published"
+            echo ""
+            echo "\`$IMAGE:${{ github.sha }}\`"
+            echo ""
+            echo "Deploy with:"
+            echo '```bash'
+            echo "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, test, container]
+    if: always()
+    steps:
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more CI jobs failed."
+          exit 1
+
+      - name: Report success
+        run: echo "All CI checks passed."

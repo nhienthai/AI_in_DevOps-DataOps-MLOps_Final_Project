@@ -1,13 +1,31 @@
 """XLM-RoBERTa / Transformer Predictor for Vietnamese Sentiment Classification."""
 
 import os
-from typing import Any, Dict, List, Optional
+from collections.abc import Sequence
+from typing import Any, List, Optional, cast
+
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer
 
-from src.sentiment.config import settings
-from src.sentiment.serving.predictor import Predictor
+from sentiment.config import settings
+from sentiment.serving.predictor import Prediction, Predictor, SentimentLabel
+
+
+def _validate_model_label_map(raw_map: object, expected: dict[int, str]) -> None:
+    """Allow generic Hugging Face labels but reject contradictory semantic labels."""
+    if not isinstance(raw_map, dict):
+        raise RuntimeError("Model config does not contain a valid id2label mapping.")
+    try:
+        normalized = {int(label_id): str(label).lower() for label_id, label in raw_map.items()}
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Model config contains an invalid id2label mapping.") from exc
+
+    is_generic = all(label == f"label_{label_id}" for label_id, label in normalized.items())
+    if not is_generic and normalized != expected:
+        raise RuntimeError(
+            f"Model label mapping {normalized} does not match serving contract {expected}."
+        )
 
 
 class TransformerPredictor(Predictor):
@@ -20,10 +38,15 @@ class TransformerPredictor(Predictor):
         device: Optional[str] = None,
     ):
         self.model_name_or_path = model_name_or_path
-        self.model_version = model_version
+        self.version = model_version
         self.label_map = settings.label_map
         self.rev_label_map = settings.rev_label_map
         self.max_length = settings.max_length
+        self.stage = "Development"
+        self.metrics: dict[str, float] = {}
+        self.fairness_delta: float | None = None
+        self.trained_at: str | None = None
+        self.run_id: str | None = None
 
         if device:
             self.device = torch.device(device)
@@ -34,31 +57,38 @@ class TransformerPredictor(Predictor):
         else:
             self.device = torch.device("cpu")
 
-        self.tokenizer = None
-        self.model = None
+        self.tokenizer: Any = None
+        self.model: Any = None
         self._load_model()
 
     def _load_model(self) -> None:
         """Load tokenizer and model architecture."""
+        config = AutoConfig.from_pretrained(self.model_name_or_path)
+        _validate_model_label_map(config.id2label, self.label_map)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name_or_path,
             num_labels=settings.num_labels,
+            id2label=self.label_map,
+            label2id=self.rev_label_map,
         )
         self.model.to(self.device)
         self.model.eval()
 
-    def predict(self, text: str) -> Dict[str, Any]:
-        """Classify single text sample."""
-        return self.predict_batch([text])[0]
-
-    def predict_batch(self, texts: List[str]) -> List[Dict[str, Any]]:
+    def predict(self, texts: Sequence[str]) -> list[Prediction]:
         """Classify a list of text strings in a single batched pass."""
         if not texts:
             return []
 
+        original_lengths = self.tokenizer(
+            list(texts),
+            add_special_tokens=True,
+            padding=False,
+            truncation=False,
+            return_length=True,
+        )["length"]
         inputs = self.tokenizer(
-            texts,
+            list(texts),
             padding=True,
             truncation=True,
             max_length=self.max_length,
@@ -70,27 +100,32 @@ class TransformerPredictor(Predictor):
             logits = outputs.logits
             probs = F.softmax(logits, dim=-1).cpu().numpy()
 
-        results = []
-        for i, text in enumerate(texts):
+        results: list[Prediction] = []
+        for i, _text in enumerate(texts):
             sample_probs = probs[i]
             pred_id = int(sample_probs.argmax())
-            pred_label = self.label_map.get(pred_id, "UNKNOWN")
+            pred_label = self.label_map.get(pred_id)
+            if pred_label not in {"negative", "neutral", "positive"}:
+                raise RuntimeError(f"Model returned unsupported label id {pred_id}.")
+            label = cast(SentimentLabel, pred_label)
             confidence = float(sample_probs[pred_id])
+            positive_id = self.rev_label_map["positive"]
+            positive_score = float(sample_probs[positive_id])
 
-            prob_dict = {
-                self.label_map[idx]: round(float(prob), 4)
-                for idx, prob in enumerate(sample_probs)
-                if idx in self.label_map
-            }
-
-            results.append({
-                "label": pred_label,
-                "score": round(confidence, 4),
-                "model_version": self.model_version,
-                "probabilities": prob_dict,
-            })
+            results.append(
+                Prediction(
+                    label=label,
+                    score=positive_score,
+                    confidence=confidence,
+                    truncated=int(original_lengths[i]) > self.max_length,
+                )
+            )
 
         return results
+
+    def predict_batch(self, texts: List[str]) -> list[Prediction]:
+        """Compatibility alias for training and validation callers."""
+        return self.predict(texts)
 
     def save_pretrained(self, save_directory: str) -> None:
         """Save model and tokenizer weights locally."""

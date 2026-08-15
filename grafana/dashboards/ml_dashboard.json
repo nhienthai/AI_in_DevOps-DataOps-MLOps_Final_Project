@@ -1,0 +1,314 @@
+{
+  "uid": "sentiment-ml",
+  "title": "Sentiment — Model & Predictions",
+  "description": "Model-level behaviour: throughput, class distribution, confidence, input drift and staleness. Queries the ml_* families exported in-process by serving/metrics.py.",
+  "tags": ["sentiment", "ml"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Model loaded",
+      "description": "ml_model_loaded. Zero means the process is alive but serving no model, so predictions return 503. Fires ModelNotLoaded after one minute.",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "ml_model_loaded", "instant": true }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "NO MODEL", "color": "red", "index": 0 } } },
+            { "type": "value", "options": { "1": { "text": "LOADED", "color": "green", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Predictions / sec",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "sum(rate(ml_predictions_total[5m]))", "instant": true }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Drift PSI",
+      "description": "Input-length PSI against the reference logged beside the model. Below 0.1 stable, 0.1-0.2 moderate, above 0.2 significant — DriftDetected fires there.",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "ml_drift_psi", "instant": true }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.1 }, { "color": "red", "value": 0.2 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "p95 inference",
+      "description": "Model time only, excluding queue wait and HTTP overhead. Compare against p95 latency on the System dashboard to separate model cost from queueing.",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(ml_prediction_duration_seconds_bucket[5m])) by (le))", "instant": true }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 4,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.1 }, { "color": "red", "value": 0.2 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Low-confidence rate",
+      "description": "Predictions below low_confidence_threshold (default 0.7). A rising share is the earliest signal that inputs have moved away from the training distribution.",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "rate(ml_low_confidence_total[5m]) / clamp_min(sum(rate(ml_predictions_total[5m])), 0.001)", "instant": true }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.2 }, { "color": "red", "value": 0.4 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Model age",
+      "description": "Time since the last reload. ModelStale fires past 7 days — informational, not an incident.",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "time() - ml_model_last_reload_timestamp", "instant": true }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 604800 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Predictions by class",
+      "description": "Output distribution over time. The model serves three classes; neutral is the minority class in UIT-VSFC, so a collapse to zero neutral is a real signal rather than noise.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "sum(rate(ml_predictions_total[5m])) by (label)", "legendFormat": "{{label}}" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 25, "showPoints": "never", "stacking": { "mode": "normal", "group": "A" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "positive" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "neutral" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
+          { "matcher": { "id": "byName", "options": "negative" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "id": 8,
+      "type": "piechart",
+      "title": "Class share",
+      "description": "Share of each class over the selected window. Compare against the training prior to judge skew.",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "sum(increase(ml_predictions_total[$__range])) by (label)", "legendFormat": "{{label}}", "instant": true }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "values": ["percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "positive" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "neutral" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
+          { "matcher": { "id": "byName", "options": "negative" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Class skew vs prior",
+      "description": "Positive share minus 0.5. PredictionSkew fires beyond 0.2 either way. Note this rule assumes a binary prior and will need rewriting per class once the three-class model is promoted.",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+          "expr": "sum(rate(ml_predictions_total{label=\"positive\"}[15m])) / clamp_min(sum(rate(ml_predictions_total[15m])), 0.001) - 0.5",
+          "legendFormat": "positive share - prior"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.2 }] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }, "tooltip": { "mode": "single", "sort": "none" } }
+    },
+    {
+      "id": 10,
+      "type": "heatmap",
+      "title": "Confidence distribution",
+      "description": "ml_prediction_confidence buckets. A healthy classifier is bimodal near the top; mass piling up at 0.5 means the model is guessing.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "sum(rate(ml_prediction_confidence_bucket[5m])) by (le)", "format": "heatmap", "legendFormat": "{{le}}" }
+      ],
+      "options": { "calculate": false, "cellGap": 1, "color": { "mode": "scheme", "scheme": "Viridis", "steps": 64 }, "yAxis": { "unit": "short" } }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Confidence quantiles",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.10, sum(rate(ml_prediction_confidence_bucket[5m])) by (le))", "legendFormat": "p10" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(ml_prediction_confidence_bucket[5m])) by (le))", "legendFormat": "median" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.90, sum(rate(ml_prediction_confidence_bucket[5m])) by (le))", "legendFormat": "p90" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0.5,
+          "max": 1,
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never", "thresholdsStyle": { "mode": "dashed" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }, { "color": "orange", "value": 0.7 }] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Input drift",
+      "description": "PSI against the training reference, with the moderate and significant boundaries drawn. A permanently rising PSI right after a promotion usually means the model shipped without its drift_reference.json artifact.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "ml_drift_psi", "legendFormat": "PSI" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.1 }, { "color": "red", "value": 0.2 }] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }, "tooltip": { "mode": "single", "sort": "none" } }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Input shape",
+      "description": "Median and p95 input length, with the truncation rate. Truncations rising means users are sending text past the model's token window and losing information.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(ml_input_length_chars_bucket[5m])) by (le))", "legendFormat": "median chars" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(ml_input_length_chars_bucket[5m])) by (le))", "legendFormat": "p95 chars" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "rate(ml_input_truncations_total[5m])", "legendFormat": "truncations/sec" }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "truncations/sec" }, "properties": [{ "id": "custom.axisPlacement", "value": "right" }, { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Prediction errors by type",
+      "description": "HighPredictionErrorRate fires above 5%. The error_type label routes the investigation: model_not_ready, inference_timeout or inference_overloaded each have a different runbook.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "sum(rate(ml_prediction_errors_total[5m])) by (error_type)", "legendFormat": "{{error_type}}" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 70, "showPoints": "never", "stacking": { "mode": "normal", "group": "A" } } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["sum"] }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Batch size distribution",
+      "description": "Median and p95 items per batch request. Large batches monopolise the inference pool, so this explains queue latency on the System dashboard.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.50, sum(rate(ml_batch_prediction_size_bucket[5m])) by (le))", "legendFormat": "median" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "histogram_quantile(0.95, sum(rate(ml_batch_prediction_size_bucket[5m])) by (le))", "legendFormat": "p95" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+    }
+  ]
+}

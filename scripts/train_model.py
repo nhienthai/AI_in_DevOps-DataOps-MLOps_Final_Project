@@ -2,19 +2,20 @@
 """CLI script to trigger baseline or XLM-RoBERTa model training."""
 
 # ⚠️ MUST be set before any mlflow import — works for MLflow 3.x on Kaggle
+import argparse
 import os
+import sys
+
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 os.environ.setdefault("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
 
-import argparse
-import sys
+# Add the src-layout package root when the script is run without installation.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-# Add project root to sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import mlflow  # noqa: E402
 
-import mlflow
-from src.sentiment.config import settings
-from src.sentiment.training.train import train_baseline_model, train_transformer_model
+from sentiment.config import settings  # noqa: E402
+from sentiment.training.train import train_baseline_model, train_transformer_model  # noqa: E402
 
 
 def main():
@@ -34,7 +35,7 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        default=settings.dataset_name,
+        default=settings.model_dataset_name,
         help="HuggingFace dataset name (default: tridm/UIT-VSFC)",
     )
     parser.add_argument(
@@ -72,6 +73,29 @@ def main():
         action="store_true",
         help="Apply clean_text_vietnamese preprocessing to dataset splits",
     )
+    parser.add_argument(
+        "--tune-trials",
+        type=int,
+        default=0,
+        help="Optuna trials for the baseline; 0 skips the sweep",
+    )
+    parser.add_argument(
+        "--cv-splits",
+        type=int,
+        default=5,
+        help="Cross-validation folds for the baseline; 0 skips it",
+    )
+    parser.add_argument(
+        "--mitigation",
+        choices=["none", "counterfactual", "blinding"],
+        default="none",
+        help="Fairness mitigation applied to the baseline",
+    )
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="Compute and log SHAP global importance",
+    )
 
     args = parser.parse_args()
 
@@ -86,7 +110,15 @@ def main():
 
     if args.model_type == "baseline":
         out_path = os.path.join(args.output_dir, "baseline_model.joblib")
-        metrics = train_baseline_model(dataset_name=args.dataset, output_path=out_path)
+        metrics = train_baseline_model(
+            dataset_name=args.dataset,
+            output_path=out_path,
+            tune_trials=args.tune_trials,
+            cv_splits=args.cv_splits,
+            mitigation=args.mitigation,
+            explain=args.explain,
+            artifacts_dir=os.path.join(args.output_dir, "baseline"),
+        )
     else:
         out_path = os.path.join(args.output_dir, "xlm-roberta")
         metrics = train_transformer_model(

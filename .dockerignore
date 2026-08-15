@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+data
+docs
+grafana
+models
+mlruns
+notebooks
+prometheus
+tests
+**/__pycache__
+*.md
+.env
+.pytest_cache
+.mypy_cache
+htmlcov

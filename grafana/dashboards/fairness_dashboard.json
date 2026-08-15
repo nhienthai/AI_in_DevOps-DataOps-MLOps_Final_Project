@@ -1,0 +1,206 @@
+{
+  "uid": "sentiment-fairness",
+  "title": "Sentiment — Fairness & Explainability",
+  "description": "Fairness of the deployed model, measured by an EEC-style identity-pair probe run over HTTP against the running service. The gauge reflects the promoted model's worst identity-pair delta; the promotion gate refuses to promote above the threshold, and FairnessRegression alerts if a deployed model exceeds it.",
+  "tags": ["sentiment", "fairness", "responsible-ai"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "gauge",
+      "title": "Max identity-pair delta",
+      "description": "The largest sentiment-score difference the probe found between two sentences that differ only by an identity term. Zero is perfect parity. The promotion gate refuses anything above 0.10.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "ml_fairness_max_delta", "instant": true }
+      ],
+      "options": {
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 0.3,
+          "decimals": 4,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.05 },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Gate status",
+      "description": "Whether the currently deployed model would pass the promotion gate today.",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "clamp_max(floor(ml_fairness_max_delta / 0.1), 1)", "instant": true }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "PASS", "color": "green", "index": 0 } } },
+            { "type": "value", "options": { "1": { "text": "FAIL", "color": "red", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Headroom to gate",
+      "description": "How much fairness budget is left before promotion would be refused.",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "0.1 - ml_fairness_max_delta", "instant": true }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0.02 }, { "color": "green", "value": 0.05 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Model version",
+      "description": "Which model the fairness number belongs to. A delta without a version is not evidence.",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "ml_model_info", "instant": true, "format": "table" }
+      ],
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^version$/", "values": false }
+      },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Predictions measured",
+      "description": "Probe requests the running service has answered. The probe measures the deployed system over HTTP, including its preprocessing and truncation, rather than importing the model.",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "sum(ml_predictions_total)", "instant": true }
+      ],
+      "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Low-confidence share",
+      "description": "Fairness-adjacent: if one identity group produces systematically lower confidence, the model is less certain about that group even when the label is right.",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "ml_low_confidence_total / clamp_min(sum(ml_predictions_total), 1)", "instant": true }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.2 }, { "color": "red", "value": 0.4 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Fairness delta over time",
+      "description": "Each step change is a promotion. A rising step is a fairness regression introduced by a new model, which is exactly what FairnessRegression is there to catch.",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "ml_fairness_max_delta", "legendFormat": "max delta" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "showPoints": "never", "lineInterpolation": "stepAfter", "thresholdsStyle": { "mode": "line" } },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.1 }] }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }, "tooltip": { "mode": "single", "sort": "none" } }
+    },
+    {
+      "id": 8,
+      "type": "piechart",
+      "title": "Output balance across classes",
+      "description": "A model that has learned a shortcut often collapses onto one class. Read this together with the identity-pair delta: parity across identity terms means little if the model predicts one label for everything.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" }, "expr": "sum(increase(ml_predictions_total[$__range])) by (label)", "legendFormat": "{{label}}", "instant": true }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "values": ["percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "positive" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "neutral" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
+          { "matcher": { "id": "byName", "options": "negative" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "text",
+      "title": "How these numbers are produced",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 16 },
+      "options": {
+        "mode": "markdown",
+        "content": "### Fairness\n\n`scripts/run_fairness_probe.py` builds sentence pairs that are identical except for one identity term — gender, region and role terms appropriate to Vietnamese student feedback — and sends both halves to the **running service** over HTTP. The metric is the largest score difference across all pairs, so it answers a falsifiable question: *does swapping one identity word change the sentiment this system reports?*\n\nThe probe deliberately does not import the model. Measuring over HTTP means the number covers preprocessing, truncation and the exact checkpoint that is deployed, which is what makes it defensible under questioning.\n\n- **Promotion gate** — `scripts/validate_model.py` refuses to promote a run whose max delta exceeds **0.10**, so fairness is a build failure rather than a paragraph in a report.\n- **Alert** — `FairnessRegression` in `prometheus/alerts/fairness_alerts.yml` fires on the same threshold for a model already deployed.\n- **Mitigation and results** — counterfactual augmentation plus class reweighting, with the before/after table and the accuracy cost stated, in [`docs/FAIRNESS.md`](https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/FAIRNESS.md).\n\n### Explainability\n\nExplanations are per-request rather than per-metric, so they are not Prometheus series:\n\n- **LIME (local)** — `POST /api/v1/explain` returns token attributions for a single input, live.\n- **SHAP (global)** — global feature importance is logged as an MLflow artifact on the training run; open it from the MLflow UI on the run that produced the deployed model.\n\n### Reading this dashboard honestly\n\nA delta of zero on a stub model means nothing — the stub derives its label from a hash and is identity-blind by construction. Check the **Model version** panel first: if it reads `stub-*`, every fairness number here is an artefact of the placeholder, not evidence about a trained model."
+      }
+    }
+  ]
+}

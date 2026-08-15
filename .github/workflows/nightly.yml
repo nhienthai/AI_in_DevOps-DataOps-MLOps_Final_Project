@@ -1,0 +1,110 @@
+# =============================================================================
+# Nightly checks for the work that is too slow for every push.
+#
+#   slow-tests ── transformer-backed tests behind @pytest.mark.slow
+#   fairness  ── the identity-pair probe against a freshly trained baseline
+#
+# These run on a schedule rather than per-commit because they download models
+# and datasets. Failing them should still wake somebody up: a fairness
+# regression that only shows at 3am is still a fairness regression.
+# =============================================================================
+
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+env:
+  PYTHON_DEFAULT: "3.11"
+
+jobs:
+  slow-tests:
+    name: Slow model tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-training.txt
+            requirements-dev.txt
+
+      - name: Cache Hugging Face downloads
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('src/sentiment/config.py') }}
+          restore-keys: hf-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Run slow tests
+        run: pytest -m slow -v --no-cov
+
+  fairness:
+    name: Fairness gate on a fresh baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Cache Hugging Face downloads
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('src/sentiment/config.py') }}
+          restore-keys: hf-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Train the baseline
+        env:
+          MLFLOW_TRACKING_URI: file:./mlruns
+        run: |
+          python scripts/train_model.py \
+            --model-type baseline \
+            --mitigation blinding \
+            --cv-splits 3 \
+            --mlflow-uri file:./mlruns
+
+      - name: Enforce the quality and fairness gate
+        run: |
+          python scripts/validate_model.py \
+            --model-path ./artifacts/baseline_model.joblib \
+            --model-type baseline \
+            --min-macro-f1 0.70 \
+            --min-accuracy 0.85 \
+            --max-fairness-delta 0.10
+
+      - name: Upload the fairness report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-fairness
+          path: |
+            artifacts/baseline/fairness_probe.json
+            artifacts/baseline/dataset_manifest.json
+          retention-days: 14
+          if-no-files-found: warn

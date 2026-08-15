@@ -1,0 +1,23 @@
+groups:
+  - name: fairness_alerts
+    rules:
+      - alert: FairnessRegression
+        expr: ml_fairness_max_delta > 0.1
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Deployed model exceeds the fairness promotion threshold"
+          description: "Max identity-pair delta is {{ $value }}, above the 0.10 gate that scripts/validate_model.py enforces at promotion time."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#fairnessregression"
+
+      - alert: FairnessUnmeasured
+        expr: |
+          ml_fairness_max_delta == 0
+            and on() ml_model_loaded == 1
+            and on() sum(rate(ml_predictions_total[15m])) > 0
+        for: 30m
+        labels: {severity: info}
+        annotations:
+          summary: "A model is serving with no fairness measurement attached"
+          description: "The fairness gauge is still zero. Either the promoted run carried no fairness metric, or identity blinding is active and the zero is genuine."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#fairnessunmeasured"

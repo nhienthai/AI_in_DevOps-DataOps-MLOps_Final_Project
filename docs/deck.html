@@ -1,0 +1,1113 @@
+<title>Six Services, Two Gates</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper:#FBFAF7; --paper-2:#F3F2ED; --paper-3:#EAE8E1;
+    --hair:#DAD8CF; --hair-2:#BCB9AD;
+    --ink:#131519; --ink-2:#494C56; --ink-mid:#83858F;
+    --accent:#2C4A5C; --accent-bg:#E5ECF0;
+    --stop:#AF3629; --stop-bg:#F8E4E1;
+    --go:#1D6849; --go-bg:#E2EFE8;
+    --warn:#8A6410; --warn-bg:#F6EEDC;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --gut:26px;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#111319; --paper-2:#191C23; --paper-3:#22262F;
+    --hair:#2B2F39; --hair-2:#434855;
+    --ink:#E9EBF1; --ink-2:#A5A9B7; --ink-mid:#787C8A;
+    --accent:#8FAEC0; --accent-bg:#1C262E;
+    --stop:#DF8376; --stop-bg:#2D1D1A;
+    --go:#68BC97; --go-bg:#15261E;
+    --warn:#CDA44F; --warn-bg:#2A2314;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  }}
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --paper:#111319; --paper-2:#191C23; --paper-3:#22262F;
+    --hair:#2B2F39; --hair-2:#434855;
+    --ink:#E9EBF1; --ink-2:#A5A9B7; --ink-mid:#787C8A;
+    --accent:#8FAEC0; --accent-bg:#1C262E;
+    --stop:#DF8376; --stop-bg:#2D1D1A;
+    --go:#68BC97; --go-bg:#15261E;
+    --warn:#CDA44F; --warn-bg:#2A2314;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+       font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  /* ══ chrome ══ */
+  .rail{position:fixed;inset:0 0 auto 0;z-index:30;display:flex;align-items:baseline;gap:14px;
+        padding:8px 20px;background:var(--paper);border-bottom:1px solid var(--hair);
+        font-family:var(--mono);font-size:11px;color:var(--ink-mid);letter-spacing:.02em}
+  .rail b{color:var(--ink-2);font-weight:600}
+  .rail__sp{color:var(--ink);font-weight:700}
+  .rail__act{color:var(--accent);text-transform:uppercase;letter-spacing:.1em}
+  .rail__t{margin-left:auto;font-variant-numeric:tabular-nums}
+  .foot{position:fixed;inset:auto 0 0 0;z-index:30;display:flex;gap:12px;align-items:center;
+        padding:6px 20px 8px;background:var(--paper);border-top:1px solid var(--hair);
+        font-family:var(--mono);font-size:10.5px;color:var(--ink-mid);letter-spacing:.04em}
+  .foot__t{color:var(--ink-2)}
+  .seg{margin-left:auto;display:flex;gap:3px}
+  .seg i{display:block;width:22px;height:3px;background:var(--hair);font-style:normal}
+  .seg i.done{background:var(--hair-2)}
+  .seg i.now{background:var(--accent)}
+
+  /* ══ stage ══ */
+  .stage{height:100%;overflow:hidden}
+  .slide{display:none;height:100%;overflow-y:auto;padding:50px 26px 40px}
+  .slide.on{display:block}
+  .wrap{max-width:1240px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+        justify-content:center;gap:14px}
+
+  /* ══ layout system ══ */
+  .l-split{display:grid;grid-template-columns:1fr 1fr;gap:var(--gut);align-items:start}
+  .l-main-aside{display:grid;grid-template-columns:1.62fr 1fr;gap:var(--gut);align-items:start}
+  .l-aside-main{display:grid;grid-template-columns:1fr 1.62fr;gap:var(--gut);align-items:start}
+  .l-fig-notes{display:grid;grid-template-columns:1fr .58fr;gap:var(--gut);align-items:center}
+  .l-triad{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gut);align-items:start}
+  .l-quad{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:960px){.l-split,.l-main-aside,.l-aside-main,.l-fig-notes,.l-triad{grid-template-columns:1fr;gap:16px}
+                          .l-quad{grid-template-columns:repeat(2,1fr)}}
+
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+           color:var(--ink-mid);display:flex;gap:10px;align-items:center}
+  .eyebrow::after{content:"";flex:1;height:1px;background:var(--hair)}
+  .eyebrow em{font-style:normal;color:var(--accent);font-weight:700}
+
+  h1{font-family:var(--mono);font-weight:700;font-size:clamp(30px,4.4vw,48px);line-height:1.05;
+     margin:0;letter-spacing:-.035em;text-wrap:balance}
+  h2{font-family:var(--mono);font-weight:700;font-size:clamp(21px,2.7vw,31px);line-height:1.1;
+     margin:0;letter-spacing:-.028em;text-wrap:balance}
+  h3{font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.02em;margin:0;color:var(--ink)}
+  p{margin:0;max-width:68ch;color:var(--ink-2)}
+  .lead{font-size:18px;color:var(--ink);max-width:58ch}
+  .sm{font-size:14px}
+  strong{color:var(--ink);font-weight:640}
+  code{font-family:var(--mono);font-size:.87em;background:var(--paper-2);padding:1px 4px;border:1px solid var(--hair)}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  ul{margin:0;padding:0;list-style:none;display:grid;gap:7px;max-width:72ch}
+  li{padding-left:16px;position:relative;color:var(--ink-2)}
+  li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:1px;background:var(--hair-2)}
+
+  /* numbered annotation markers, tied to diagrams */
+  .keys{display:grid;gap:9px;counter-reset:k}
+  .key{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start;font-size:14px;color:var(--ink-2)}
+  .key b{display:grid;place-items:center;width:19px;height:19px;border:1px solid var(--accent);
+         color:var(--accent);font-family:var(--mono);font-size:11px;font-weight:700;border-radius:50%}
+  .key.stop b{border-color:var(--stop);color:var(--stop)}
+  .key strong{color:var(--ink)}
+
+  figure{margin:0;display:grid;gap:8px}
+  figure svg{width:100%;max-width:100%;height:auto;display:block}
+  figcaption{font-size:12.5px;color:var(--ink-mid);font-family:var(--mono);line-height:1.45;
+             border-top:1px solid var(--hair);padding-top:6px}
+
+  .card{border:1px solid var(--hair);padding:13px 15px;display:grid;gap:6px;background:var(--paper)}
+  .card--stop{border-color:var(--stop)}
+  .card--go{border-color:var(--go)}
+  .card--warn{border-color:var(--warn)}
+  .card h3{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-mid)}
+  .card--stop h3{color:var(--stop)} .card--go h3{color:var(--go)} .card--warn h3{color:var(--warn)}
+  .card p{font-size:14px}
+
+  .callout{border-left:2px solid var(--accent);padding:2px 0 2px 15px}
+  .callout--stop{border-color:var(--stop)}
+  .callout p{color:var(--ink)}
+  .kicker{font-family:var(--mono);font-size:19px;line-height:1.32;color:var(--ink);max-width:32ch;letter-spacing:-.022em}
+
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  .tw{overflow-x:auto}
+  th,td{text-align:left;padding:6px 12px 6px 0;border-bottom:1px solid var(--hair);vertical-align:top}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+     color:var(--ink-mid);font-weight:500;white-space:nowrap}
+  td{color:var(--ink-2)}
+  td.k{color:var(--ink);white-space:nowrap}
+  td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;padding-right:14px;white-space:nowrap}
+  tr.pick td{background:var(--go-bg)}
+  tr.pick td.k{color:var(--ink);font-weight:650}
+
+  .pill{display:inline-block;padding:1px 6px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+        text-transform:uppercase;font-weight:700;white-space:nowrap}
+  .pill--go{background:var(--go-bg);color:var(--go)}
+  .pill--stop{background:var(--stop-bg);color:var(--stop)}
+  .pill--warn{background:var(--warn-bg);color:var(--warn)}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));border:1px solid var(--hair)}
+  .stat{padding:11px 13px;border-right:1px solid var(--hair);display:grid;gap:1px}
+  .stat:last-child{border-right:0}
+  .stat__v{font-family:var(--mono);font-size:23px;font-variant-numeric:tabular-nums;color:var(--ink);
+           line-height:1.05;letter-spacing:-.025em}
+  .stat__l{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--ink-mid);text-transform:uppercase}
+  .stat--go .stat__v{color:var(--go)} .stat--stop .stat__v{color:var(--stop)} .stat--warn .stat__v{color:var(--warn)}
+
+  .spec{display:grid;grid-template-columns:auto 1fr;gap:0 16px;font-size:13.5px;align-content:start}
+  .spec dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+           color:var(--ink-mid);padding:6px 0;border-bottom:1px solid var(--hair);white-space:nowrap}
+  .spec dd{margin:0;padding:6px 0;border-bottom:1px solid var(--hair);color:var(--ink-2)}
+  .spec dd b{color:var(--ink);font-weight:640}
+
+  .code{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--paper-2);
+        border:1px solid var(--hair);padding:11px 13px;overflow-x:auto;color:var(--ink-2)}
+  .code b{color:var(--ink);font-weight:600}
+  .code .go{color:var(--go)} .code .no{color:var(--stop)} .code .d{color:var(--ink-mid)}
+
+  .agenda{display:grid;gap:0;border:1px solid var(--hair)}
+  .ag{display:grid;grid-template-columns:26px 1fr auto auto;gap:14px;align-items:baseline;
+      padding:9px 14px;border-bottom:1px solid var(--hair)}
+  .ag:last-child{border-bottom:0}
+  .ag__n{font-family:var(--mono);font-size:10.5px;color:var(--ink-mid)}
+  .ag__t{color:var(--ink);font-size:15px}
+  .ag__t s{text-decoration:none;color:var(--ink-mid);font-size:13.5px}
+  .ag__w{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700}
+  .ag__m{font-family:var(--mono);font-size:11px;color:var(--ink-mid);font-variant-numeric:tabular-nums}
+  .ag--hero{background:var(--accent-bg)}
+
+  .notes{display:none;background:var(--accent-bg);border-left:2px solid var(--accent);padding:10px 14px;
+         font-size:13.5px;color:var(--ink-2);max-width:78ch}
+  body.notes .notes{display:block}
+  .notes b{color:var(--ink)}
+
+  .grid{position:fixed;inset:0;z-index:40;display:none;background:var(--paper);overflow-y:auto;padding:48px 20px 26px}
+  body.grid .grid{display:block}
+  .grid__in{max-width:1040px;margin:0 auto;border:1px solid var(--hair)}
+  .g{width:100%;background:var(--paper);border:0;border-bottom:1px solid var(--hair);cursor:pointer;
+     display:grid;grid-template-columns:30px 1fr 96px 74px 42px;gap:11px;align-items:center;
+     padding:8px 13px;font:inherit;color:var(--ink-2);text-align:left}
+  .g:last-child{border-bottom:0}
+  .g:hover,.g:focus-visible{background:var(--paper-2);color:var(--ink);outline:none}
+  .g span{font-family:var(--mono);font-size:11px}
+  .g .gt{font-size:14.5px;color:var(--ink);font-family:var(--sans)}
+  .g .ga{color:var(--accent);font-size:10px;letter-spacing:.07em;text-transform:uppercase}
+  .g .gs{color:var(--ink-mid)}
+  .g .gm{color:var(--ink-mid);text-align:right;font-variant-numeric:tabular-nums}
+
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  @media(max-width:720px){body{font-size:15px}.slide{padding:48px 14px 40px}.l-quad{grid-template-columns:1fr 1fr}}
+</style>
+
+<div class="rail">
+  <span><b id="rn">1</b>/<span id="rtot">19</span></span>
+  <span class="rail__act" id="ract">Frame</span>
+  <span class="rail__sp" id="rsp">Nhiên</span>
+  <span>· <b>←→</b> slide · <b>G</b> map · <b>N</b> notes</span>
+  <span class="rail__t"><span id="rt">0:45</span> · <b id="rc">0:45</b>/<span id="rbud">18:00</span></span>
+</div>
+
+<main class="stage" id="stage">
+
+<!-- 01 ══════════════════════════════════════════ -->
+<section class="slide on" data-sp="Nhiên" data-act="Frame" data-min="0.75" data-t="Title &amp; the problem">
+  <div class="wrap">
+    <div class="eyebrow">DDM501 · AI in Production · Topic 8 · Sentiment Analysis Service</div>
+    <div class="l-main-aside">
+      <div style="display:grid;gap:16px">
+        <h1>Six services,<br>two gates.</h1>
+        <p class="lead">Vietnamese student course feedback, classified as a production system — where nothing reaches a user without passing a check that can stop the build.</p>
+        <div class="stats">
+          <div class="stat"><span class="stat__v">30k</span><span class="stat__l">comments / semester</span></div>
+          <div class="stat"><span class="stat__v">2</span><span class="stat__l">week deadline</span></div>
+          <div class="stat stat--stop"><span class="stat__v">0</span><span class="stat__l">read today</span></div>
+        </div>
+      </div>
+      <div style="display:grid;gap:12px">
+        <div class="tw"><table><tbody>
+          <tr><td class="k">Lý Minh Thông</td><td class="n">M1</td><td class="sm">Data &amp; Features</td></tr>
+          <tr><td class="k">Dương Thành Duy</td><td class="n">M2</td><td class="sm">Training &amp; Experiments</td></tr>
+          <tr><td class="k">Bùi Vân Sơn</td><td class="n">M3</td><td class="sm">Serving &amp; Containers</td></tr>
+          <tr><td class="k">Lê Công Huỳnh</td><td class="n">M4</td><td class="sm">Monitoring &amp; CI/CD</td></tr>
+          <tr><td class="k">Thái Bình Nhiên</td><td class="n">M5</td><td class="sm">Responsible AI &amp; Docs</td></tr>
+        </tbody></table></div>
+        <div class="card card--stop">
+          <h3>the actual cost</h3>
+          <p>Keyword counting cannot separate <code>thầy dạy hay</code> from <code>thầy dạy <b>không</b> hay</code>. So a department finds a failing course <strong>a semester late</strong>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><b>0:45.</b> Land the problem and the title's promise — "two gates" is the spine of the whole deck. No models yet.</div>
+  </div>
+</section>
+
+<!-- 02 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Nhiên" data-act="Frame" data-min="0.5" data-t="How this is structured">
+  <div class="wrap">
+    <div class="eyebrow">Roadmap · <em>18 minutes</em></div>
+    <h2>Where the time goes, and why</h2>
+    <div class="l-main-aside">
+      <div class="agenda">
+        <div class="ag"><span class="ag__n">I</span><span class="ag__t">Frame <s>— the problem and the one constraint that shapes everything</s></span><span class="ag__w"></span><span class="ag__m">2:15</span></div>
+        <div class="ag ag--hero"><span class="ag__n">II</span><span class="ag__t">Deep dive <s>— architecture, gates, serving, monitoring, CI</s></span><span class="ag__w">40% of the mark</span><span class="ag__m">9:45</span></div>
+        <div class="ag"><span class="ag__n">III</span><span class="ag__t">Responsible AI <s>— fairness measured, mitigated, gated</s></span><span class="ag__w">15%</span><span class="ag__m">2:45</span></div>
+        <div class="ag"><span class="ag__n">IV</span><span class="ag__t">Live demo <s>— seven commands against a running stack</s></span><span class="ag__w">15%</span><span class="ag__m">1:45</span></div>
+        <div class="ag"><span class="ag__n">V</span><span class="ag__t">What we got wrong, and close</span><span class="ag__w"></span><span class="ag__m">1:30</span></div>
+      </div>
+      <div class="card">
+        <h3>the through-line</h3>
+        <p>Every section answers the same question in its own domain: <strong>what stops a bad thing from reaching production, and how do we know it works?</strong></p>
+        <p style="margin-top:6px">Twice in this deck the answer is “a gate caught it and code review did not”.</p>
+      </div>
+    </div>
+    <div class="notes"><b>0:25.</b> Say the weights out loud. It signals you read the rubric and tells the panel where to spend their attention.</div>
+  </div>
+</section>
+
+<!-- 03 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Thông" data-act="Frame" data-min="1" data-t="The 4% constraint">
+  <div class="wrap">
+    <div class="eyebrow">01 · The constraint · <em>UIT-VSFC</em></div>
+    <h2>One class is 4% of the corpus</h2>
+    <div class="l-fig-notes">
+      <figure>
+        <svg viewBox="0 0 560 176" role="img" aria-label="Training split: negative 5,325 rows, neutral 458 rows, positive 5,643 rows. Neutral is 4.0% of the training set.">
+          <g font-family="ui-monospace,monospace" font-size="12">
+            <text x="0" y="24" fill="var(--ink-2)">negative</text>
+            <rect x="86" y="12" width="442" height="19" fill="var(--s1)"/>
+            <text x="520" y="26" fill="#fff" text-anchor="end" font-weight="700">5,325</text>
+            <text x="0" y="70" fill="var(--ink-2)">neutral</text>
+            <rect x="86" y="58" width="38" height="19" fill="var(--s2)"/>
+            <text x="132" y="72" fill="var(--ink)" font-weight="700">458</text>
+            <text x="178" y="72" fill="var(--s2)" font-weight="700">4.0%</text>
+            <text x="222" y="72" fill="var(--ink-mid)" font-size="11">of the training set</text>
+            <text x="0" y="116" fill="var(--ink-2)">positive</text>
+            <rect x="86" y="104" width="468" height="19" fill="var(--s1)"/>
+            <text x="546" y="118" fill="#fff" text-anchor="end" font-weight="700">5,643</text>
+            <line x1="86" y1="138" x2="560" y2="138" stroke="var(--hair)"/>
+            <text x="86" y="156" fill="var(--ink-mid)" font-size="11">11,426 train · 1,583 validation · 3,166 test</text>
+            <text x="86" y="170" fill="var(--ink-mid)" font-size="11">rarest-class share holds at 4.0 / 4.6 / 5.3% across splits</text>
+          </g>
+        </svg>
+        <figcaption>Not slightly under-represented — an order of magnitude smaller than the other two.</figcaption>
+      </figure>
+      <div style="display:grid;gap:12px">
+        <div class="stats" style="grid-template-columns:1fr 1fr">
+          <div class="stat"><span class="stat__v">0.8629</span><span class="stat__l">accuracy</span></div>
+          <div class="stat stat--warn"><span class="stat__v">0.7149</span><span class="stat__l">macro-F1</span></div>
+        </div>
+        <p class="sm">Accuracy is carried by the two large classes. Macro-F1 weights <code>neutral</code> equally with them — so <strong>a model can look 86% right and be poor at a third of the label space.</strong></p>
+      </div>
+    </div>
+    <div class="l-triad">
+      <div class="card"><h3>consequence 1</h3><p>The balance rule is a <strong>per-class floor</strong>, not a deviation from a 0.5 prior. A prior only exists for a balanced binary problem.</p></div>
+      <div class="card"><h3>consequence 2</h3><p>The tuning objective is <strong>cross-validated</strong>. One split can move macro-F1 by points on 458 rows alone.</p></div>
+      <div class="card"><h3>consequence 3</h3><p>The original <strong>macro-F1 ≥ 0.92</strong> target — written for balanced binary English — was replaced with one that is reachable and justified.</p></div>
+    </div>
+    <div class="notes"><b>1:00.</b> The most important data slide. If they remember one number from your section, it is 4%. The three cards are the payoff — say “three decisions trace back to this”.</div>
+  </div>
+</section>
+
+<!-- 04 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="0.5" data-t="System at a glance">
+  <div class="wrap">
+    <div class="eyebrow">02 · Deep dive · <em>specification</em></div>
+    <h2>The system, in numbers</h2>
+    <div class="l-split">
+      <dl class="spec">
+        <dt>services</dt><dd><b>6</b> — api · postgres · mlflow · prometheus · alertmanager · grafana, every one with a health check</dd>
+        <dt>api</dt><dd>FastAPI + uvicorn, versioned at <code>/api/v1</code>, OpenAPI 3.1 with examples on <b>12/12</b> schemas</dd>
+        <dt>model</dt><dd>TF-IDF + LogisticRegression, registry version <b>2</b>, stage <b>Production</b></dd>
+        <dt>limits</dt><dd>batch <b>64</b> · text <b>5,000</b> chars · body <b>1 MB</b> · <b>2</b> concurrent inferences</dd>
+        <dt>budgets</dt><dd>queue <b>1s</b> · inference <b>30s</b> · p95 target <b>200 ms</b></dd>
+        <dt>image</dt><dd>multi-stage, non-root UID 1000, base pinned by digest, no <code>pip</code> in the runtime layer</dd>
+      </dl>
+      <div style="display:grid;gap:12px">
+        <div class="l-quad">
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">20</span><span class="stat__l">metrics</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">10</span><span class="stat__l">alerts</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">3</span><span class="stat__l">dashboards</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">159</span><span class="stat__l">tests</span></div>
+        </div>
+        <div class="card card--go">
+          <h3>the boundary that paid off</h3>
+          <p>All six services were integrated in <strong>week 1 against a stub model</strong>. Swapping in a real model later touched the predictor factory and nothing else — the HTTP contract, the metrics and the tests did not move.</p>
+        </div>
+        <div class="card">
+          <h3>what is not built</h3>
+          <p>The fine-tuned transformer. It trains and satisfies the serving contract, but no checkpoint has been promoted — so every model number in this deck is the baseline's.</p>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><b>0:30.</b> A reference slide — do not read it. Point at the two cards. Panels like knowing the numbers exist and are stated without being asked.</div>
+  </div>
+</section>
+
+<!-- 05 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="1.25" data-t="Architecture end to end">
+  <div class="wrap">
+    <div class="eyebrow">03 · Deep dive · <em>architecture</em></div>
+    <h2>Where a model comes from, and where it goes</h2>
+    <figure>
+      <svg viewBox="0 0 1240 268" role="img" aria-label="End-to-end architecture. Dataset flows through normalise, a quality gate that can stop the run, fingerprinting, training and tuning, then a promotion gate into the MLflow registry. The API loads the promoted model, serves clients, and exposes metrics to Prometheus, Grafana and Alertmanager.">
+        <defs>
+          <marker id="A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          <marker id="AS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--stop)"/></marker>
+          <marker id="AG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker>
+        </defs>
+        <g font-family="ui-monospace,monospace" font-size="11.5" color="var(--ink-2)">
+          <rect x="0" y="18" width="1240" height="112" fill="var(--paper-2)" stroke="var(--hair)"/>
+          <text x="10" y="34" fill="var(--ink-mid)" font-size="10">TRAINING · compose --profile training, or Kaggle GPU</text>
+
+          <rect x="16" y="52" width="92" height="38" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="62" y="70" text-anchor="middle" fill="var(--ink)">UIT-VSFC</text>
+          <text x="62" y="83" text-anchor="middle" fill="var(--ink-mid)" font-size="10">3 classes</text>
+          <line x1="108" y1="71" x2="146" y2="71" stroke="currentColor" marker-end="url(#A)"/>
+
+          <rect x="148" y="52" width="88" height="38" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="192" y="75" text-anchor="middle" fill="var(--ink)">normalise</text>
+          <line x1="236" y1="71" x2="272" y2="71" stroke="currentColor" marker-end="url(#A)"/>
+
+          <polygon points="342,42 408,71 342,100 276,71" fill="var(--stop-bg)" stroke="var(--stop)" stroke-width="1.5"/>
+          <text x="342" y="68" text-anchor="middle" fill="var(--stop)" font-weight="700" font-size="11">validate()</text>
+          <text x="342" y="81" text-anchor="middle" fill="var(--stop)" font-size="9.5">5 checks</text>
+          <circle cx="288" cy="40" r="9" fill="var(--paper)" stroke="var(--stop)"/><text x="288" y="44" text-anchor="middle" fill="var(--stop)" font-size="10" font-weight="700">1</text>
+          <line x1="342" y1="100" x2="342" y2="120" stroke="var(--stop)" marker-end="url(#AS)"/>
+          <text x="350" y="118" fill="var(--stop)" font-size="9.5">run stops</text>
+
+          <line x1="408" y1="71" x2="444" y2="71" stroke="currentColor" marker-end="url(#A)"/>
+          <rect x="446" y="52" width="96" height="38" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="494" y="70" text-anchor="middle" fill="var(--ink)">fingerprint</text>
+          <text x="494" y="83" text-anchor="middle" fill="var(--ink-mid)" font-size="10">sha256</text>
+          <circle cx="536" cy="40" r="9" fill="var(--paper)" stroke="var(--accent)"/><text x="536" y="44" text-anchor="middle" fill="var(--accent)" font-size="10" font-weight="700">2</text>
+          <line x1="542" y1="71" x2="578" y2="71" stroke="currentColor" marker-end="url(#A)"/>
+
+          <rect x="580" y="52" width="104" height="38" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="632" y="70" text-anchor="middle" fill="var(--ink)">tune · fit</text>
+          <text x="632" y="83" text-anchor="middle" fill="var(--ink-mid)" font-size="10">10 trials, CV</text>
+          <circle cx="678" cy="40" r="9" fill="var(--paper)" stroke="var(--accent)"/><text x="678" y="44" text-anchor="middle" fill="var(--accent)" font-size="10" font-weight="700">3</text>
+          <line x1="684" y1="71" x2="720" y2="71" stroke="currentColor" marker-end="url(#A)"/>
+
+          <polygon points="796,42 870,71 796,100 722,71" fill="var(--stop-bg)" stroke="var(--stop)" stroke-width="1.5"/>
+          <text x="796" y="68" text-anchor="middle" fill="var(--stop)" font-weight="700" font-size="11">promote?</text>
+          <text x="796" y="81" text-anchor="middle" fill="var(--stop)" font-size="9.5">4 checks</text>
+          <circle cx="736" cy="40" r="9" fill="var(--paper)" stroke="var(--stop)"/><text x="736" y="44" text-anchor="middle" fill="var(--stop)" font-size="10" font-weight="700">4</text>
+          <line x1="796" y1="100" x2="796" y2="120" stroke="var(--stop)" marker-end="url(#AS)"/>
+          <text x="804" y="118" fill="var(--stop)" font-size="9.5">exit 1</text>
+
+          <line x1="870" y1="71" x2="906" y2="71" stroke="currentColor" marker-end="url(#A)"/>
+          <rect x="908" y="46" width="150" height="50" fill="var(--accent-bg)" stroke="var(--accent)"/>
+          <text x="983" y="66" text-anchor="middle" fill="var(--accent)" font-weight="700">MLflow registry</text>
+          <text x="983" y="80" text-anchor="middle" fill="var(--accent)" font-size="10">stage: Production</text>
+          <text x="983" y="91" text-anchor="middle" fill="var(--ink-mid)" font-size="9.5">postgres + artifact volume</text>
+
+          <line x1="983" y1="96" x2="983" y2="152" stroke="var(--accent)" marker-end="url(#AG)"/>
+          <text x="993" y="126" fill="var(--accent)" font-size="9.5">loaded at startup ·</text>
+          <text x="993" y="138" fill="var(--accent)" font-size="9.5">PREDICTOR_BACKEND=registry</text>
+
+          <rect x="0" y="154" width="1240" height="98" fill="none" stroke="var(--hair)"/>
+          <text x="10" y="170" fill="var(--ink-mid)" font-size="10">SERVING &amp; OBSERVABILITY</text>
+
+          <rect x="16" y="186" width="80" height="42" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="56" y="212" text-anchor="middle" fill="var(--ink)">client</text>
+          <line x1="96" y1="207" x2="136" y2="207" stroke="currentColor" marker-end="url(#A)"/>
+          <text x="100" y="200" fill="var(--ink-mid)" font-size="9.5">HTTP</text>
+
+          <rect x="138" y="174" width="230" height="66" fill="var(--accent-bg)" stroke="var(--accent)"/>
+          <text x="253" y="194" text-anchor="middle" fill="var(--accent)" font-weight="700">api · FastAPI</text>
+          <text x="253" y="209" text-anchor="middle" fill="var(--ink-2)" font-size="10">/predict · /predict/batch · /explain</text>
+          <text x="253" y="222" text-anchor="middle" fill="var(--ink-2)" font-size="10">/model/info · /health · /ready</text>
+          <text x="253" y="234" text-anchor="middle" fill="var(--ink-mid)" font-size="9.5">bounded pool · atomic reload</text>
+          <circle cx="356" cy="186" r="9" fill="var(--paper)" stroke="var(--accent)"/><text x="356" y="190" text-anchor="middle" fill="var(--accent)" font-size="10" font-weight="700">5</text>
+
+          <line x1="368" y1="207" x2="410" y2="207" stroke="currentColor" marker-end="url(#A)"/>
+          <text x="372" y="200" fill="var(--ink-mid)" font-size="9.5">/metrics</text>
+          <rect x="412" y="186" width="110" height="42" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="467" y="205" text-anchor="middle" fill="var(--ink)">prometheus</text>
+          <text x="467" y="219" text-anchor="middle" fill="var(--ink-mid)" font-size="10">10 rules</text>
+          <circle cx="510" cy="196" r="9" fill="var(--paper)" stroke="var(--accent)"/><text x="510" y="200" text-anchor="middle" fill="var(--accent)" font-size="10" font-weight="700">6</text>
+
+          <line x1="522" y1="197" x2="560" y2="197" stroke="currentColor" marker-end="url(#A)"/>
+          <rect x="562" y="180" width="96" height="34" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="610" y="201" text-anchor="middle" fill="var(--ink)">grafana</text>
+          <line x1="522" y1="217" x2="560" y2="217" stroke="currentColor" marker-end="url(#A)"/>
+          <rect x="562" y="218" width="96" height="30" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="610" y="238" text-anchor="middle" fill="var(--ink)">alertmanager</text>
+
+          <text x="700" y="192" fill="var(--ink-mid)" font-size="10">The two red diamonds are the only places</text>
+          <text x="700" y="206" fill="var(--ink-mid)" font-size="10">a run can die. Everything downstream of</text>
+          <text x="700" y="220" fill="var(--ink-mid)" font-size="10">them has already been checked — which is</text>
+          <text x="700" y="234" fill="var(--ink-mid)" font-size="10">what the title means by “two gates”.</text>
+        </g>
+      </svg>
+      <figcaption>Training and serving meet in exactly one place: the registry. Nothing else crosses the boundary.</figcaption>
+    </figure>
+    <div class="l-triad">
+      <div class="keys">
+        <div class="key stop"><b>1</b><span><strong>Quality gate</strong> — raises, does not warn</span></div>
+        <div class="key"><b>2</b><span><strong>Fingerprint</strong> — sha256 of the rows, in order</span></div>
+      </div>
+      <div class="keys">
+        <div class="key"><b>3</b><span><strong>Tuning</strong> — 10 nested runs, CV objective</span></div>
+        <div class="key stop"><b>4</b><span><strong>Promotion gate</strong> — F1, accuracy, latency, fairness</span></div>
+      </div>
+      <div class="keys">
+        <div class="key"><b>5</b><span><strong>Bounded serving</strong> — sheds rather than queues</span></div>
+        <div class="key"><b>6</b><span><strong>Alerts</strong> — every rule links to a runbook</span></div>
+      </div>
+    </div>
+    <div class="notes"><b>1:15.</b> Walk the numbers 1→6, one sentence each. Do not describe boxes that carry no argument. The claim is: the registry is the only seam.</div>
+  </div>
+</section>
+
+<!-- 06 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Thông" data-act="Deep dive" data-min="1" data-t="Gate one: the data">
+  <div class="wrap">
+    <div class="eyebrow">04 · Deep dive · <em>gate one</em></div>
+    <h2>The gate fails the run, it does not warn</h2>
+    <div class="l-main-aside">
+      <div class="tw">
+        <table>
+          <thead><tr><th>Check</th><th>Rejects</th><th class="n">Threshold</th></tr></thead>
+          <tbody>
+            <tr><td class="k">schema</td><td>a missing <code>label</code> or <code>text</code> column</td><td class="n">exact</td></tr>
+            <tr><td class="k">empty text</td><td>whitespace-only rows above tolerance</td><td class="n">0%</td></tr>
+            <tr><td class="k">duplicates</td><td>copy-paste inflation of one opinion</td><td class="n">≤ 5%</td></tr>
+            <tr><td class="k">class presence</td><td>a class that vanished from a split</td><td class="n">3 of 3</td></tr>
+            <tr><td class="k">rarest share</td><td>a split that cannot score its minority class</td><td class="n">≥ 2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid;gap:11px">
+        <div class="card">
+          <h3>why 2% and not a prior</h3>
+          <p>The rule used to be “positive ratio within 0.1 of 0.5” — correct for balanced binary, guaranteed to fail every healthy run here. 2% sits under the observed 4.0 / 4.6 / 5.3% and far above zero.</p>
+        </div>
+        <div class="card card--stop">
+          <h3>it was broken, and we found it</h3>
+          <p>Training used to call <code>load_dataset()</code> directly, so this gate guarded data <strong>nobody trained on</strong>. Training now has one entrance, and a <code>Settings</code> validator raises if the data and training layers ever name different datasets.</p>
+        </div>
+      </div>
+    </div>
+    <div class="l-split">
+      <div class="code">
+        <span class="d">$</span> python scripts/train_model.py<br>
+        train      <b>11426</b> rows · classes [0,1,2] · rarest <b>0.0401</b><br>
+        validation <b>1583</b> rows · rarest <b>0.0461</b><br>
+        test       <b>3166</b> rows · rarest <b>0.0527</b><br>
+        sha256     <b>006759bf5ccc43dc…</b> <span class="go">→ logged to MLflow</span>
+      </div>
+      <div class="callout">
+        <p>The fingerprint is over the rows <strong>in order</strong>, with delimiters — so reordering changes it, and two different datasets that concatenate to the same bytes do not collide. Both have tests.</p>
+        <p class="sm" style="margin-top:8px">It answers a question you otherwise cannot: <em>did these two runs see the same data?</em></p>
+      </div>
+    </div>
+    <div class="notes"><b>1:00.</b> “Fails the run” is the phrase, not “validates”. If asked why not DVC: the dataset is immutable on the hub — we needed provenance, not remote storage.</div>
+  </div>
+</section>
+
+<!-- 07 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="0.75" data-t="Technology trade-offs">
+  <div class="wrap">
+    <div class="eyebrow">05 · Deep dive · <em>decisions</em></div>
+    <h2>What we chose, and what we gave up</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Decision</th><th>Chosen</th><th>Rejected</th><th>What it cost us</th></tr></thead>
+        <tbody>
+          <tr class="pick"><td class="k">Model</td><td class="k">XLM-RoBERTa + TF-IDF baseline</td><td>DistilBERT · PhoBERT</td><td>DistilBERT is English-only, so not a candidate. XLM-R is ~4× larger — <strong>the 200 ms CPU budget is now an open risk, not a settled property</strong>. PhoBERT would likely score better on Vietnamese but gives up the multilingual claim.</td></tr>
+          <tr><td class="k">Drift measure</td><td class="k">PSI on input length</td><td>KS test · KL · Evidently</td><td>PSI has a conventional reading (&lt;0.1 / 0.1–0.2 / &gt;0.2), so the threshold is arguable rather than invented. It is coarser than KS.</td></tr>
+          <tr><td class="k">Fairness method</td><td class="k">Identity-pair probe (EEC)</td><td>Group-wise metrics · Fairlearn</td><td>The corpus has no demographic columns, so group metrics are impossible. The probe measures the model, not the population — a real limitation.</td></tr>
+          <tr><td class="k">Metrics</td><td class="k">In-process <code>prometheus_client</code></td><td>Sidecar exporter · StatsD</td><td>Drift and confidence are functions of the prediction, so a sidecar would mean shipping predictions to a second process. Cost: the API owns its own instrumentation.</td></tr>
+          <tr><td class="k">Lint chain</td><td class="k">flake8 + black + isort, pinned</td><td>ruff</td><td>ruff replaces all three and is far faster. We took consistency with the graded labs over speed, and pinned versions so a release cannot redden the build.</td></tr>
+          <tr><td class="k">Orchestration</td><td class="k">Docker Compose</td><td>Kubernetes</td><td>Required by the brief and right for one laptop. No horizontal scaling — the drift window is in-memory, and we document that rather than engineer around it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout--stop">
+      <p><strong>The row that matters is the first.</strong> We changed the model family after the spec was written, and the latency budget it was written for no longer applies. That is stated here rather than discovered by a grader in <code>ARCHITECTURE.md</code>.</p>
+    </div>
+    <div class="notes"><b>0:45.</b> Do not read the table. Pick the model row and the ruff row — one shows a risk we accepted, one shows a speed we declined. Both prove the decision was made rather than defaulted.</div>
+  </div>
+</section>
+
+<!-- 08 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Duy" data-act="Deep dive" data-min="1" data-t="Ten trials, an 11-point spread">
+  <div class="wrap">
+    <div class="eyebrow">06 · Deep dive · <em>experiments</em></div>
+    <h2>The search did real work</h2>
+    <div class="l-fig-notes">
+      <figure>
+        <svg viewBox="0 0 560 200" role="img" aria-label="Ten Optuna trials with cross-validated macro-F1 from 0.5975 to 0.7079. Trial 0 is best at 0.7079; trial 5 is worst at 0.5975.">
+          <g font-family="ui-monospace,monospace" font-size="10.5">
+            <line x1="44" y1="14" x2="44" y2="160" stroke="var(--hair)"/>
+            <line x1="44" y1="160" x2="548" y2="160" stroke="var(--hair)"/>
+            <text x="38" y="18" text-anchor="end" fill="var(--ink-mid)">0.72</text>
+            <text x="38" y="90" text-anchor="end" fill="var(--ink-mid)">0.66</text>
+            <text x="38" y="163" text-anchor="end" fill="var(--ink-mid)">0.59</text>
+            <rect x="56" y="28" width="34" height="132" fill="var(--s1)"/>
+            <rect x="104" y="70" width="34" height="90" fill="var(--s1)" opacity=".42"/>
+            <rect x="152" y="39" width="34" height="121" fill="var(--s1)" opacity=".42"/>
+            <rect x="200" y="95" width="34" height="65" fill="var(--s1)" opacity=".42"/>
+            <rect x="248" y="30" width="34" height="130" fill="var(--s1)" opacity=".42"/>
+            <rect x="296" y="152" width="34" height="8" fill="var(--s2)"/>
+            <rect x="344" y="39" width="34" height="121" fill="var(--s1)" opacity=".42"/>
+            <rect x="392" y="76" width="34" height="84" fill="var(--s1)" opacity=".42"/>
+            <rect x="440" y="30" width="34" height="130" fill="var(--s1)" opacity=".42"/>
+            <rect x="488" y="31" width="34" height="129" fill="var(--s1)" opacity=".42"/>
+            <text x="73" y="23" text-anchor="middle" fill="var(--ink)" font-weight="700">.7079</text>
+            <text x="313" y="147" text-anchor="middle" fill="var(--ink)" font-weight="700">.5975</text>
+            <text x="73" y="176" text-anchor="middle" fill="var(--ink-mid)">0</text>
+            <text x="313" y="176" text-anchor="middle" fill="var(--ink-mid)">5</text>
+            <text x="505" y="176" text-anchor="middle" fill="var(--ink-mid)">9</text>
+            <text x="296" y="194" text-anchor="middle" fill="var(--ink-mid)">trial · 3-fold cross-validated macro-F1</text>
+          </g>
+        </svg>
+        <figcaption>Best and worst labelled; the rest are context. 11 points of spread means the ranking is of configurations, not of luck.</figcaption>
+      </figure>
+      <div style="display:grid;gap:11px">
+        <div class="code">best trial <b>0</b><br>ngram_range <b>(1,2)</b><br>max_features <b>5000</b><br>C <b>0.964</b><br>class_weight <b>balanced</b> <span class="go">← rediscovered</span></div>
+        <p class="sm">The sweep independently chose to weight the minority class. Nobody told it about the 4%.</p>
+      </div>
+    </div>
+    <div class="l-split">
+      <div class="card card--warn">
+        <h3>the expensive choice</h3>
+        <p>The objective is <strong>cross-validated</strong>, not a single held-out score. That is 3× the compute — and the only reason the ranking means anything. On one split, the trial that drew the favourable fold wins and its configuration does not reproduce.</p>
+      </div>
+      <div class="card">
+        <h3>what MLflow holds</h3>
+        <p><strong>18 runs.</strong> Each trial is a nested run under one parent, carrying its params, its cross-validated score, the dataset fingerprint, SHAP importance charts and a fairness report.</p>
+      </div>
+    </div>
+    <div class="notes"><b>1:00.</b> If asked about the transformer: implemented, contract-tested by the slow suite, not promoted. Say it before they ask — slide 4 already flagged it.</div>
+  </div>
+</section>
+
+<!-- 09 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Duy" data-act="Deep dive" data-min="1.25" data-t="Gate two, and the bug it caught">
+  <div class="wrap">
+    <div class="eyebrow">07 · Deep dive · <em>gate two</em></div>
+    <h2>Promotion is a rule, not a decision</h2>
+    <div class="l-main-aside">
+      <div class="tw">
+        <table>
+          <thead><tr><th>Check</th><th class="n">Threshold</th><th class="n">Measured</th><th></th><th>What it protects against</th></tr></thead>
+          <tbody>
+            <tr><td class="k">macro-F1</td><td class="n">≥ 0.70</td><td class="n">0.7149</td><td><span class="pill pill--go">pass</span></td><td>a model that abandoned the minority class</td></tr>
+            <tr><td class="k">accuracy</td><td class="n">≥ 0.85</td><td class="n">0.8629</td><td><span class="pill pill--go">pass</span></td><td>a model that is fair and useless</td></tr>
+            <tr><td class="k">p95 latency</td><td class="n">&lt; 200 ms</td><td class="n">0.42 ms</td><td><span class="pill pill--go">pass</span></td><td>a model too slow for the SLO</td></tr>
+            <tr><td class="k">fairness gap</td><td class="n">≤ 0.10</td><td class="n">0.0000</td><td><span class="pill pill--go">pass</span></td><td>bias shipping because nobody re-measured</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card card--go">
+        <h3>rollback</h3>
+        <p>A stage transition plus a reload. <strong>No rebuild, no redeploy</strong> — which is what makes it safe enough to do under pressure at 3am.</p>
+      </div>
+    </div>
+    <div class="callout callout--stop"><p class="kicker">The gate caught a bug that code review did not.</p></div>
+    <div class="l-aside-main">
+      <div class="code">
+        train  blind_identity=True → <span class="go">0.000000</span><br>
+        save   <span class="d">joblib.dump(pipeline)</span> <span class="no">← flag lost</span><br>
+        load   blind_identity=<b>False</b> → <span class="no">0.079990</span><br>
+        gate   <span class="no">FAIL — refused to promote</span>
+      </div>
+      <div style="display:grid;gap:9px">
+        <p>A model trained with identity blinding <strong>lost the flag when it was reloaded from joblib</strong>, and kept predicting — on text it had never been fitted on. Textbook train/serve skew, and it ships silently almost everywhere.</p>
+        <p>It was caught because the gate <strong>re-measures the loaded artifact</strong> rather than trusting the number training reported. The flag now travels inside the artifact, and a regression test fails if it ever stops.</p>
+      </div>
+    </div>
+    <div class="notes"><b>1:15.</b> The best story in the deck — tell it slowly. The transferable point: measure the thing you will deploy, not the thing you trained.</div>
+  </div>
+</section>
+
+<!-- 10 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="1.25" data-t="Serving: shed, don't queue">
+  <div class="wrap">
+    <div class="eyebrow">08 · Deep dive · <em>serving under load</em></div>
+    <h2>Three exits, and none of them block the loop</h2>
+    <figure>
+      <svg viewBox="0 0 1240 236" role="img" aria-label="Request lifecycle: a request acquires one of two semaphore slots within a one-second queue budget, runs in a thread pool under a thirty-second timeout, and exits as 200, 429 when the pool is full, or 504 on timeout.">
+        <defs>
+          <marker id="B" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+          <marker id="BS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--stop)"/></marker>
+          <marker id="BG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--go)"/></marker>
+        </defs>
+        <g font-family="ui-monospace,monospace" font-size="12" color="var(--ink-2)">
+          <text x="0" y="16" fill="var(--ink-mid)" font-size="10">EVENT LOOP — never blocked</text>
+          <line x1="0" y1="24" x2="1240" y2="24" stroke="var(--hair)" stroke-dasharray="4 4"/>
+
+          <rect x="0" y="48" width="96" height="38" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="48" y="71" text-anchor="middle" fill="var(--ink)">request</text>
+          <line x1="96" y1="67" x2="138" y2="67" stroke="currentColor" marker-end="url(#B)"/>
+
+          <rect x="140" y="40" width="152" height="54" fill="var(--paper-2)" stroke="var(--hair-2)"/>
+          <text x="216" y="58" text-anchor="middle" fill="var(--ink)">semaphore</text>
+          <rect x="172" y="66" width="36" height="16" fill="var(--accent)"/>
+          <rect x="216" y="66" width="36" height="16" fill="var(--accent)"/>
+          <text x="216" y="107" text-anchor="middle" fill="var(--ink-mid)" font-size="10">2 slots · budget 1s</text>
+          <line x1="292" y1="67" x2="336" y2="67" stroke="currentColor" marker-end="url(#B)"/>
+
+          <rect x="338" y="40" width="180" height="54" fill="var(--paper)" stroke="var(--hair-2)"/>
+          <text x="428" y="58" text-anchor="middle" fill="var(--ink)">ThreadPoolExecutor</text>
+          <text x="428" y="74" text-anchor="middle" fill="var(--ink-mid)" font-size="10">model.predict()</text>
+          <text x="428" y="87" text-anchor="middle" fill="var(--ink-mid)" font-size="10">timeout 30s</text>
+          <line x1="518" y1="67" x2="576" y2="67" stroke="var(--go)" marker-end="url(#BG)"/>
+          <rect x="578" y="48" width="128" height="38" fill="var(--go-bg)" stroke="var(--go)"/>
+          <text x="642" y="66" text-anchor="middle" fill="var(--go)" font-weight="700">200</text>
+          <text x="642" y="79" text-anchor="middle" fill="var(--go)" font-size="10">prediction</text>
+
+          <line x1="216" y1="94" x2="216" y2="152" stroke="var(--stop)" marker-end="url(#BS)"/>
+          <text x="226" y="128" fill="var(--stop)" font-size="10">budget expired</text>
+          <rect x="140" y="154" width="152" height="40" fill="var(--stop-bg)" stroke="var(--stop)"/>
+          <text x="216" y="172" text-anchor="middle" fill="var(--stop)" font-weight="700">429</text>
+          <text x="216" y="186" text-anchor="middle" fill="var(--stop)" font-size="10">inference_overloaded</text>
+
+          <line x1="428" y1="94" x2="428" y2="152" stroke="var(--stop)" marker-end="url(#BS)"/>
+          <text x="438" y="128" fill="var(--stop)" font-size="10">over time budget</text>
+          <rect x="352" y="154" width="152" height="40" fill="var(--stop-bg)" stroke="var(--stop)"/>
+          <text x="428" y="172" text-anchor="middle" fill="var(--stop)" font-weight="700">504</text>
+          <text x="428" y="186" text-anchor="middle" fill="var(--stop)" font-size="10">inference_timeout</text>
+
+          <line x1="740" y1="34" x2="740" y2="212" stroke="var(--hair)"/>
+          <text x="762" y="52" fill="var(--ink-mid)" font-size="10">SHEDDING IS COUNTABLE, NOT SILENT</text>
+          <text x="762" y="74" fill="var(--ink-2)" font-size="11">ml_inference_overloads_total</text>
+          <text x="762" y="90" fill="var(--ink-2)" font-size="11">ml_inference_queue_depth</text>
+          <text x="762" y="106" fill="var(--ink-2)" font-size="11">ml_inference_queue_duration_seconds</text>
+          <text x="762" y="122" fill="var(--ink-2)" font-size="11">ml_inference_timeouts_total</text>
+          <text x="762" y="150" fill="var(--ink-mid)" font-size="10">Compare p95 queue wait against p95 model time:</text>
+          <text x="762" y="164" fill="var(--ink-mid)" font-size="10">high queue + low model → raise the slot count.</text>
+          <text x="762" y="178" fill="var(--ink-mid)" font-size="10">Low queue + high model → the model is the cost.</text>
+          <text x="762" y="200" fill="var(--ink-mid)" font-size="10">That diagnostic is why both are exported separately.</text>
+        </g>
+      </svg>
+      <figcaption>An unbounded queue turns an overload into a timeout for everybody. The semaphore converts it into a fast, countable refusal.</figcaption>
+    </figure>
+    <div class="l-split">
+      <div class="card"><h3>429, not 503</h3><p>429 says “retry shortly” — a full pool is the service working as designed. 503 is what <code>/ready</code> returns when <em>no model is loaded</em>. Two different facts deserve two different codes.</p></div>
+      <div class="card"><h3>/health stays 200</h3><p>If a model fault turned liveness red, the orchestrator would restart the container in a loop while you diagnosed it — and you would lose the logs each time. The Docker <code>HEALTHCHECK</code> targets <code>/ready</code>, so a broken release is still not marked healthy.</p></div>
+    </div>
+    <div class="notes"><b>1:15.</b> The densest slide — walk left to right, then down. Expect “why not autoscale”: single-replica CPU is the stated target and the drift window is in-memory.</div>
+  </div>
+</section>
+
+<!-- 11 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="0.75" data-t="Atomic reload">
+  <div class="wrap">
+    <div class="eyebrow">09 · Deep dive · <em>atomic reload</em></div>
+    <h2>The replacement warms before it is published</h2>
+    <figure>
+      <svg viewBox="0 0 1240 150" role="img" aria-label="Atomic reload in three states: while warming the old model still serves; on success the pointer swaps in one assignment; on failure the old model keeps serving and the error is reported.">
+        <g font-family="ui-monospace,monospace" font-size="11.5" color="var(--ink-2)">
+          <text x="0" y="12" fill="var(--ink-mid)" font-size="10">1 · WARMING</text>
+          <rect x="0" y="20" width="392" height="100" fill="none" stroke="var(--hair)"/>
+          <rect x="24" y="42" width="150" height="32" fill="var(--go-bg)" stroke="var(--go)"/>
+          <text x="99" y="63" text-anchor="middle" fill="var(--go)" font-weight="700">v2 · serving</text>
+          <rect x="214" y="42" width="150" height="32" fill="none" stroke="var(--hair-2)" stroke-dasharray="3 3"/>
+          <text x="289" y="63" text-anchor="middle" fill="var(--ink-mid)">v3 · loading</text>
+          <text x="24" y="94" fill="var(--ink-mid)" font-size="10">a warm-up prediction runs through</text>
+          <text x="24" y="107" fill="var(--ink-mid)" font-size="10">validate_predictions() before anything swaps</text>
+
+          <text x="424" y="12" fill="var(--ink-mid)" font-size="10">2A · SUCCESS</text>
+          <rect x="424" y="20" width="392" height="100" fill="none" stroke="var(--go)"/>
+          <rect x="448" y="42" width="150" height="32" fill="none" stroke="var(--hair-2)"/>
+          <text x="523" y="63" text-anchor="middle" fill="var(--ink-mid)">v2 · dropped</text>
+          <rect x="638" y="42" width="150" height="32" fill="var(--go-bg)" stroke="var(--go)"/>
+          <text x="713" y="63" text-anchor="middle" fill="var(--go)" font-weight="700">v3 · serving</text>
+          <text x="448" y="94" fill="var(--ink-mid)" font-size="10">publish is one assignment under a lock —</text>
+          <text x="448" y="107" fill="var(--ink-mid)" font-size="10">there is no half-loaded window</text>
+
+          <text x="848" y="12" fill="var(--ink-mid)" font-size="10">2B · FAILURE</text>
+          <rect x="848" y="20" width="392" height="100" fill="none" stroke="var(--stop)"/>
+          <rect x="872" y="42" width="150" height="32" fill="var(--go-bg)" stroke="var(--go)"/>
+          <text x="947" y="63" text-anchor="middle" fill="var(--go)" font-weight="700">v2 · still serving</text>
+          <rect x="1062" y="42" width="150" height="32" fill="var(--stop-bg)" stroke="var(--stop)"/>
+          <text x="1137" y="63" text-anchor="middle" fill="var(--stop)" font-weight="700">v3 · rejected</text>
+          <text x="872" y="94" fill="var(--stop)" font-size="10">ml_model_load_failures_total++</text>
+          <text x="872" y="107" fill="var(--ink-mid)" font-size="10">error surfaced on /model/info</text>
+
+          <text x="0" y="142" fill="var(--ink-mid)" font-size="10">Compare 2A with 2B: the only difference is which pointer wins. There is no state in which neither model serves.</text>
+        </g>
+      </svg>
+      <figcaption>The old model is never dropped before the new one has answered a real prediction correctly.</figcaption>
+    </figure>
+    <div class="callout"><p class="kicker">A bad rollback cannot take the service down — which is what makes rollback safe enough to actually use.</p></div>
+    <div class="notes"><b>0:45.</b> Point at 2B. This answers “what happens at 3am when the promoted model is broken”, which is the question behind every rollback story.</div>
+  </div>
+</section>
+
+<!-- 12 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Huỳnh" data-act="Deep dive" data-min="0.75" data-t="Four kinds of test">
+  <div class="wrap">
+    <div class="eyebrow">10 · Deep dive · <em>testing</em></div>
+    <h2>Five categories, each catching what the others cannot</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Category</th><th class="n">Tests</th><th>The question it answers</th><th>What it caught in practice</th></tr></thead>
+        <tbody>
+          <tr><td class="k">unit</td><td class="n">47</td><td>Does this function do what its docstring says?</td><td>A blank reload token must disable the endpoint, not set an empty secret</td></tr>
+          <tr><td class="k">data quality</td><td class="n">21</td><td>Would bad data reach training?</td><td>The gate must fail a split whose rarest class collapses to 0.5%</td></tr>
+          <tr><td class="k">model</td><td class="n">30</td><td>Does the model satisfy its contract, and is it any good?</td><td class="k">The blinding flag lost in a joblib round-trip</td></tr>
+          <tr><td class="k">responsible AI</td><td class="n">32</td><td>Do the fairness instruments measure what they claim?</td><td class="k">A probe that returns zero for everything would look like a fair model</td></tr>
+          <tr><td class="k">integration</td><td class="n">29</td><td>Does the assembled HTTP surface behave end to end?</td><td>Unicode and emoji survive the round trip; a bad batch item is isolated</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="l-triad">
+      <div class="stats" style="grid-template-columns:1fr 1fr">
+        <div class="stat stat--go"><span class="stat__v">91%</span><span class="stat__l">coverage · 85% gate</span></div>
+        <div class="stat"><span class="stat__v">159</span><span class="stat__l">total</span></div>
+      </div>
+      <div class="card card--warn">
+        <h3>coverage was a lie, briefly</h3>
+        <p>The omit list excluded <code>data/</code>, <code>models/</code>, <code>training/</code> and <code>responsible/</code> — so a real 91% described <strong>a quarter of the package</strong>. Narrowed to the two modules that need a GPU and a live server.</p>
+      </div>
+      <div class="card">
+        <h3>testing the instrument</h3>
+        <p>The fairness probe is asserted to <strong>detect a known injected bias</strong> on the right axis and report zero for a known-fair scorer. An unchecked instrument can manufacture a result.</p>
+      </div>
+    </div>
+    <div class="notes"><b>0:45.</b> The fourth column is the slide. Anyone can count tests; naming what each category actually caught is what shows the suite is load-bearing.</div>
+  </div>
+</section>
+
+<!-- 13 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Huỳnh" data-act="Deep dive" data-min="1" data-t="Drift, and the reference that makes it mean something">
+  <div class="wrap">
+    <div class="eyebrow">11 · Deep dive · <em>monitoring</em></div>
+    <h2>The reference travels with the model</h2>
+    <div class="l-fig-notes">
+      <figure>
+        <svg viewBox="0 0 560 196" role="img" aria-label="PSI compares the live input-length histogram against a reference logged beside the model at training time. Below 0.1 stable, 0.1 to 0.2 moderate, above 0.2 fires DriftDetected.">
+          <g font-family="ui-monospace,monospace" font-size="10.5">
+            <text x="0" y="11" fill="var(--ink-mid)">REFERENCE · logged beside the model</text>
+            <rect x="0" y="20" width="46" height="22" fill="var(--s1)" opacity=".5"/>
+            <rect x="52" y="20" width="46" height="34" fill="var(--s1)" opacity=".5"/>
+            <rect x="104" y="20" width="46" height="46" fill="var(--s1)" opacity=".5"/>
+            <rect x="156" y="20" width="46" height="30" fill="var(--s1)" opacity=".5"/>
+            <rect x="208" y="20" width="46" height="16" fill="var(--s1)" opacity=".5"/>
+            <line x1="0" y1="68" x2="254" y2="68" stroke="var(--hair)"/>
+            <text x="300" y="11" fill="var(--ink-mid)">LIVE · rolling window</text>
+            <rect x="300" y="20" width="46" height="10" fill="var(--s2)"/>
+            <rect x="352" y="20" width="46" height="18" fill="var(--s2)"/>
+            <rect x="404" y="20" width="46" height="30" fill="var(--s2)"/>
+            <rect x="456" y="20" width="46" height="48" fill="var(--s2)"/>
+            <rect x="508" y="20" width="46" height="44" fill="var(--s2)"/>
+            <line x1="300" y1="68" x2="554" y2="68" stroke="var(--hair)"/>
+            <text x="0" y="83" fill="var(--ink-mid)">input length, binned →</text>
+            <text x="300" y="83" fill="var(--ink-mid)">the shape has moved right</text>
+
+            <text x="0" y="114" fill="var(--ink-2)">PSI</text>
+            <rect x="40" y="102" width="470" height="15" fill="var(--paper-2)" stroke="var(--hair)"/>
+            <rect x="40" y="102" width="141" height="15" fill="var(--s3)"/>
+            <line x1="181" y1="96" x2="181" y2="123" stroke="var(--ink)" stroke-width="1.5"/>
+            <text x="185" y="95" fill="var(--ink)" font-size="10" font-weight="700">0.1</text>
+            <line x1="275" y1="96" x2="275" y2="123" stroke="var(--stop)" stroke-width="1.5"/>
+            <text x="279" y="95" fill="var(--stop)" font-size="10" font-weight="700">0.2 → alert</text>
+            <text x="40" y="136" fill="var(--ink-mid)">stable</text>
+            <text x="187" y="136" fill="var(--ink-mid)">moderate</text>
+            <text x="281" y="136" fill="var(--ink-mid)">significant shift</text>
+
+            <line x1="0" y1="154" x2="554" y2="154" stroke="var(--hair)"/>
+            <text x="0" y="172" fill="var(--ink-mid)">If the artifact is missing, serving falls back to a bootstrap reference —</text>
+            <text x="0" y="188" fill="var(--stop)" font-weight="700">and the signal drifts forever against the wrong baseline.</text>
+          </g>
+        </svg>
+        <figcaption>PSI has a conventional reading, which is why the threshold is 0.2 rather than a number someone liked.</figcaption>
+      </figure>
+      <div style="display:grid;gap:10px">
+        <div class="code"><span class="d">$</span> curl :9093/api/v2/alerts<br><b>DriftDetected</b> warning <span class="go">active</span></div>
+        <p class="sm"><strong>Driven to <code>FIRING</code> for real</strong> with <code>load_test.py --scenario drift</code>, and confirmed received by Alertmanager — not just “the expression looks right”.</p>
+        <div class="card card--stop">
+          <h3>what we cannot demonstrate</h3>
+          <p><code>HighLatencyP95</code> has <strong>never</strong> been observed firing. The baseline answers in 0.42 ms, so no concurrency this stack can generate reaches 500 ms. Verified by inspection only.</p>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><b>1:00.</b> Volunteering the unverified alert buys credibility for the nine that are verified. Do not let it be discovered in Q&amp;A instead.</div>
+  </div>
+</section>
+
+<!-- 14 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Huỳnh" data-act="Deep dive" data-min="0.75" data-t="CI/CD">
+  <div class="wrap">
+    <div class="eyebrow">12 · Deep dive · <em>ci/cd</em></div>
+    <h2>lint → type → test → build → scan → publish</h2>
+    <div class="l-main-aside">
+      <div style="display:grid;gap:11px">
+        <div class="l-quad">
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">3.10<span style="font-size:14px"> · </span>3.11</span><span class="stat__l">matrix</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">Trivy</span><span class="stat__l">image scan</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">SBOM</span><span class="stat__l">cyclonedx</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">GHCR</span><span class="stat__l">publish on main</span></div>
+        </div>
+        <ul>
+          <li>The publish job <strong>pulls the published image back</strong> and checks <code>/ready</code> — a broken publish fails in CI, not on someone else's machine</li>
+          <li>A nightly workflow runs the <code>slow</code> set and re-checks the fairness gate on a freshly trained model</li>
+          <li>Smoke tests run against the real Compose stack, not a mock</li>
+        </ul>
+      </div>
+      <div class="card card--stop">
+        <h3>ci was stricter than our own command</h3>
+        <p>The workflow hand-listed <code>mypy</code> and the type stubs while <code>requirements-dev.txt</code> pinned a different stubs version — so <code>make typecheck</code> passed locally and the build failed.</p>
+        <p style="margin-top:6px"><strong>Two places pinning one toolchain is the bug.</strong> CI now installs from <code>requirements-dev.txt</code>, and the drift cannot recur.</p>
+      </div>
+    </div>
+    <div class="notes"><b>0:45.</b> The right-hand card is the point: we treat the toolchain as part of the system, not as somebody's laptop setup.</div>
+  </div>
+</section>
+
+<!-- 15 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Nhiên" data-act="Responsible AI" data-min="1.75" data-t="Fairness: measured, mitigated, gated">
+  <div class="wrap">
+    <div class="eyebrow">13 · Responsible AI · <em>the measurement</em></div>
+    <h2>Two sentences, one word apart</h2>
+    <div class="l-fig-notes">
+      <figure>
+        <svg viewBox="0 0 560 166" role="img" aria-label="Probe construction: one template is filled with a male and a female identity term, both sent to the deployed service over HTTP, and the absolute difference between the returned scores is the identity-pair delta.">
+          <defs><marker id="C" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+          <g font-family="ui-monospace,monospace" font-size="11" color="var(--ink-2)">
+            <rect x="0" y="0" width="248" height="26" fill="var(--paper-2)" stroke="var(--hair)"/>
+            <text x="9" y="18" fill="var(--ink)">{person} dạy rất nhiệt tình .</text>
+            <text x="258" y="18" fill="var(--ink-mid)" font-size="10">1 of 12 templates</text>
+            <line x1="58" y1="26" x2="58" y2="46" stroke="currentColor" marker-end="url(#C)"/>
+            <line x1="188" y1="26" x2="188" y2="46" stroke="currentColor" marker-end="url(#C)"/>
+            <rect x="0" y="48" width="120" height="24" fill="none" stroke="var(--s1)"/>
+            <text x="60" y="65" text-anchor="middle" fill="var(--s1)" font-weight="700">thầy</text>
+            <rect x="128" y="48" width="120" height="24" fill="none" stroke="var(--s2)"/>
+            <text x="188" y="65" text-anchor="middle" fill="var(--s2)" font-weight="700">cô</text>
+            <line x1="58" y1="72" x2="58" y2="92" stroke="currentColor" marker-end="url(#C)"/>
+            <line x1="188" y1="72" x2="188" y2="92" stroke="currentColor" marker-end="url(#C)"/>
+            <text x="262" y="86" fill="var(--ink-mid)" font-size="10">POST /api/v1/predict</text>
+            <text x="262" y="99" fill="var(--ink-mid)" font-size="10">against the deployed service</text>
+            <rect x="0" y="94" width="120" height="28" fill="var(--paper-2)" stroke="var(--hair)"/>
+            <text x="60" y="113" text-anchor="middle" fill="var(--ink)">0.612</text>
+            <rect x="128" y="94" width="120" height="28" fill="var(--paper-2)" stroke="var(--hair)"/>
+            <text x="188" y="113" text-anchor="middle" fill="var(--ink)">0.470</text>
+            <line x1="124" y1="128" x2="124" y2="142" stroke="var(--stop)"/>
+            <text x="0" y="154" fill="var(--stop)" font-weight="700">delta 0.1417</text>
+            <text x="100" y="154" fill="var(--ink-mid)" font-size="10">— attributable to one word, because nothing else changed</text>
+          </g>
+        </svg>
+        <figcaption>216 sentences · 60 comparable pairs · gender, region, seniority.</figcaption>
+      </figure>
+      <div style="display:grid;gap:10px">
+        <p class="sm">UIT-VSFC has <strong>no demographic columns</strong> — group-wise accuracy is impossible, because there is nobody to group by. So the probe interrogates the model, <strong>over HTTP against the deployed service</strong>, covering the real preprocessing and the real checkpoint.</p>
+        <p class="sm">The score compared is the continuous output, not the argmax label. Two sentences can share a label while the model is visibly less positive about one of them.</p>
+      </div>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 1240 118" role="img" aria-label="Worst identity-pair gap by dimension. Unmitigated: gender 0.1417, region 0.0868, seniority 0.0340. After counterfactual augmentation: gender 0.0297, region 0.1080. Identity blinding takes every dimension to zero.">
+        <g font-family="ui-monospace,monospace" font-size="10.5">
+          <text x="0" y="11" fill="var(--ink-mid)">WORST GAP BY DIMENSION · gate 0.10</text>
+          <line x1="150" y1="18" x2="150" y2="102" stroke="var(--hair)"/>
+          <line x1="700" y1="16" x2="700" y2="104" stroke="var(--stop)" stroke-dasharray="4 3"/>
+          <text x="706" y="14" fill="var(--stop)" font-size="10" font-weight="700">0.10 gate</text>
+          <text x="142" y="32" text-anchor="end" fill="var(--ink-2)">gender</text>
+          <rect x="150" y="22" width="779" height="12" fill="var(--s1)"/><text x="937" y="32" fill="var(--ink)" font-weight="700">.1417</text>
+          <text x="142" y="49" text-anchor="end" fill="var(--ink-2)">region</text>
+          <rect x="150" y="39" width="477" height="12" fill="var(--s1)"/><text x="635" y="49" fill="var(--ink)">.0868</text>
+          <text x="142" y="66" text-anchor="end" fill="var(--ink-2)">seniority</text>
+          <rect x="150" y="56" width="187" height="12" fill="var(--s1)"/><text x="345" y="66" fill="var(--ink)">.0340</text>
+          <text x="142" y="86" text-anchor="end" fill="var(--ink-2)">gender</text>
+          <rect x="150" y="76" width="163" height="12" fill="var(--s2)"/><text x="321" y="86" fill="var(--ink)" font-weight="700">.0297</text>
+          <text x="142" y="103" text-anchor="end" fill="var(--ink-2)">region</text>
+          <rect x="150" y="93" width="594" height="12" fill="var(--s2)"/><text x="752" y="103" fill="var(--ink)" font-weight="700">.1080</text>
+        </g>
+      </svg>
+      <figcaption><span style="color:var(--s1)">■</span> unmitigated &nbsp; <span style="color:var(--s2)">■</span> after counterfactual augmentation &nbsp;·&nbsp; identity blinding reaches exactly 0.0000 on every dimension, so it has no bar to draw.</figcaption>
+    </figure>
+
+    <div class="l-triad">
+      <div class="card card--stop">
+        <h3>the mitigation that failed</h3>
+        <p>Counterfactual augmentation cut gender bias <strong>79%</strong> and still failed the gate — <strong>region</strong> became the binding constraint at 0.1080.</p>
+      </div>
+      <div class="card">
+        <h3>why, measurably</h3>
+        <p>Region terms appear <strong>0 times</strong> in training data; <code>thầy</code> and <code>cô</code> appear in <strong>23.9%</strong> and <strong>11.1%</strong> of rows. Augmentation cannot teach words the model never saw.</p>
+      </div>
+      <div class="card card--go">
+        <h3>what worked, and its cost</h3>
+        <p>Blinding removes the terms before vectorising — exactly zero by construction. Cost: <strong>+0.0006</strong> macro-F1. Free, which is itself the finding.</p>
+      </div>
+    </div>
+    <div class="notes"><b>1:45 — the highest-value slide. Do not rush.</b> Then the admission: our first measurement said 0.63, because the probe used capitalised <code>Thầy</code> against an entirely lowercase corpus. It was measuring casing, not bias.</div>
+  </div>
+</section>
+
+<!-- 16 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Nhiên" data-act="Responsible AI" data-min="0.75" data-t="Explainability &amp; refusal">
+  <div class="wrap">
+    <div class="eyebrow">14 · Responsible AI · <em>explainability &amp; ethics</em></div>
+    <h2>The model reads the concession</h2>
+    <div class="l-aside-main">
+      <div class="code">
+        <span class="d">"Giáo viên dạy rất hay nhưng<br>&nbsp;tài liệu thì sơ sài."</span><br><br>
+        rất &nbsp;&nbsp;&nbsp;&nbsp;<span class="go">+0.30</span><br>
+        hay &nbsp;&nbsp;&nbsp;&nbsp;<span class="go">+0.26</span><br>
+        nhưng &nbsp;&nbsp;<span class="no">−0.19</span><br>
+        thì &nbsp;&nbsp;&nbsp;&nbsp;<span class="no">−0.16</span><br><br>
+        → <b>negative</b><br><span class="d">live, /api/v1/explain</span>
+      </div>
+      <div style="display:grid;gap:11px">
+        <div class="l-split">
+          <div class="card"><h3>LIME · local, live</h3><p>Which tokens moved <em>this</em> decision. Rebuilt whenever a reload changes the model, so an explanation never describes a model that is no longer answering.</p></div>
+          <div class="card"><h3>SHAP · global, offline</h3><p>What the model relies on overall. Logged as an MLflow artifact per training run, with a chart per class.</p></div>
+        </div>
+        <div class="card card--stop">
+          <h3>what this system refuses to be used for</h3>
+          <p><strong>Evaluating an individual lecturer.</strong> A per-teacher score from a model with a measured identity gap, on sarcasm it cannot read, is a number that looks objective and is not — and employment consequences from it would be indefensible. This is aggregate triage, and <code>docs/ETHICS.md</code> says so before anyone asks.</p>
+        </div>
+        <p class="sm"><strong>Stated limitation.</strong> The <code>Predictor</code> protocol exposes one positive-class score, so LIME explains the positive-class probability rather than attributing across all three classes.</p>
+      </div>
+    </div>
+    <div class="notes"><b>0:45.</b> The refusal is the part that scores. Anyone can add SHAP; naming the use you decline is what “thoughtful ethics” means.</div>
+  </div>
+</section>
+
+<!-- 17 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Sơn + Huỳnh" data-act="Demo" data-min="1.75" data-t="Live demo">
+  <div class="wrap">
+    <div class="eyebrow">15 · Live demo · <em>1:45</em></div>
+    <h2>Seven commands against a running stack</h2>
+    <div class="l-main-aside">
+      <div class="code">
+        <span class="d">1</span> docker compose ps <span class="d">………………… six healthy services</span><br>
+        <span class="d">2</span> curl /api/v1/model/info <span class="d">………… v2 · Production · fairness_delta 0.0</span><br>
+        <span class="d">3</span> curl /api/v1/predict <span class="d">……………… one positive, one negative</span><br>
+        <span class="d">4</span> curl /api/v1/predict/batch <span class="d">……… empty item isolated, batch survives</span><br>
+        <span class="d">5</span> curl /api/v1/explain <span class="d">……………… live token attributions</span><br>
+        <span class="d">6</span> Grafana → Sentiment <span class="d">………………… three dashboards, populated</span><br>
+        <span class="d">7</span> load_test.py --scenario drift <span class="d">…… DriftDetected goes pending</span>
+      </div>
+      <div style="display:grid;gap:10px">
+        <div class="card card--stop">
+          <h3>rules we do not break</h3>
+          <p><strong>Pre-warm the stack.</strong> Never <code>up --build</code> in front of the room.</p>
+          <p style="margin-top:5px"><strong>macOS: AirPlay Receiver off.</strong> It binds port 5000 and makes MLflow answer 403 while being perfectly healthy.</p>
+        </div>
+        <div class="card">
+          <h3>handover</h3>
+          <p>Sơn drives 1–5, Huỳnh drives 6–7. Agreed out loud before starting, so it does not get negotiated on stage.</p>
+        </div>
+      </div>
+    </div>
+    <div class="callout"><p>Every response is saved as a fallback slide in a second window. The demo is <strong>15%</strong> of the presentation mark and the only part that can fail publicly.</p></div>
+    <div class="notes"><b>1:45.</b> Rehearse until boring. If the stack misbehaves, switch to fallbacks without commentary — narrating a failure costs more time than the failure does.</div>
+  </div>
+</section>
+
+<!-- 18 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="cả nhóm" data-act="Close" data-min="0.75" data-t="What we got wrong">
+  <div class="wrap">
+    <div class="eyebrow">16 · Retrospective</div>
+    <h2>Five things we got wrong</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>What</th><th>How it was caught</th><th>What changed</th></tr></thead>
+        <tbody>
+          <tr><td class="k">A macro-F1 ≥ 0.92 target</td><td>Written for balanced binary English, kept after the switch to 3-class Vietnamese</td><td>Reachable targets, both metrics required together</td></tr>
+          <tr><td class="k">A probe measuring capitalisation</td><td>The “0.63 bias” was <code>Thầy</code> against a lowercase corpus</td><td>The probe is unit-tested against a known injected bias</td></tr>
+          <tr><td class="k">Coverage over ¼ of the package</td><td>The omit list hid four modules</td><td>Narrowed; the real figure is 91%</td></tr>
+          <tr><td class="k">Train/serve skew on a flag</td><td class="k">The promotion gate — not code review</td><td>The flag travels in the artifact; regression test</td></tr>
+          <tr><td class="k">CI stricter than <code>make typecheck</code></td><td class="k">A type error passed review and broke the build</td><td>One file pins the toolchain</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="l-split">
+      <div class="callout"><p class="kicker">Each one is now a test or a config change — not a lesson we are trusting ourselves to remember.</p></div>
+      <div class="card">
+        <h3>the pattern</h3>
+        <p>Three of the five were caught by <strong>a gate or a build</strong>, not by a person reading a diff. That is the argument for the whole architecture: humans miss things, so the system has to be the one that does not.</p>
+      </div>
+    </div>
+    <div class="notes"><b>0:45.</b> Do not skip. It pre-empts half the hostile questions, and “caught by the gate, not by review” is the sentence that proves the design works.</div>
+  </div>
+</section>
+
+<!-- 19 ══════════════════════════════════════════ -->
+<section class="slide" data-sp="Nhiên" data-act="Close" data-min="0.5" data-t="Close">
+  <div class="wrap">
+    <div class="eyebrow">17 · Close</div>
+    <h2>What is deployed, and what is honest</h2>
+    <div class="stats">
+      <div class="stat stat--go"><span class="stat__v">0.0000</span><span class="stat__l">identity gap</span></div>
+      <div class="stat"><span class="stat__v">0.7149</span><span class="stat__l">macro-F1</span></div>
+      <div class="stat"><span class="stat__v">0.8629</span><span class="stat__l">accuracy</span></div>
+      <div class="stat"><span class="stat__v">91%</span><span class="stat__l">coverage</span></div>
+      <div class="stat"><span class="stat__v">10</span><span class="stat__l">alerts + runbooks</span></div>
+    </div>
+    <div class="l-split">
+      <div class="card card--go">
+        <h3>deployed</h3>
+        <p>A gated, monitored, explainable service. The model in <code>Production</code> got there <strong>by rule</strong>, and every prediction traces back to an MLflow run carrying its params, its data fingerprint and its fairness measurement.</p>
+      </div>
+      <div class="card card--stop">
+        <h3>not yet — and possibly never</h3>
+        <p>The XLM-RoBERTa fine-tune. If it beats the baseline on quality and misses the CPU latency budget, <strong>the honest outcome is to keep the baseline and say so</strong>. The registry makes that a one-line decision rather than a rewrite.</p>
+      </div>
+    </div>
+    <p class="lead">Questions.</p>
+    <div class="notes"><b>0:30.</b> Hand to Q&amp;A. Each member owns their own area — three prepared questions each in <code>docs/QA_PREP.md</code>.</div>
+  </div>
+</section>
+
+</main>
+
+<div class="foot">
+  <span id="fa">FRAME</span><span>·</span><span class="foot__t" id="ft">Title &amp; the problem</span>
+  <span class="seg" id="seg"></span>
+</div>
+<div class="grid" id="grid"><div class="grid__in" id="gi"></div></div>
+
+<script>
+  var S = [].slice.call(document.querySelectorAll('.slide')), i = 0;
+  var $ = function (x) { return document.getElementById(x); };
+  function mmss(m){var s=Math.round(m*60);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+  var cum=[], run=0;
+  S.forEach(function(s){ run+=parseFloat(s.dataset.min); cum.push(run); });
+  $('rtot').textContent=S.length; $('rbud').textContent=mmss(run);
+
+  S.forEach(function(){ var e=document.createElement('i'); $('seg').appendChild(e); });
+  var segs=[].slice.call($('seg').children);
+
+  function show(n){
+    i=Math.max(0,Math.min(S.length-1,n));
+    S.forEach(function(s,k){ s.classList.toggle('on',k===i); });
+    var s=S[i];
+    $('rn').textContent=i+1;
+    $('rsp').textContent=s.dataset.sp;
+    $('ract').textContent=s.dataset.act;
+    $('rt').textContent=mmss(parseFloat(s.dataset.min));
+    $('rc').textContent=mmss(cum[i]);
+    $('fa').textContent=s.dataset.act.toUpperCase();
+    $('ft').textContent=s.dataset.t;
+    segs.forEach(function(e,k){ e.className = k<i?'done':(k===i?'now':''); });
+    s.scrollTop=0;
+    history.replaceState(null,'','#s'+(i+1));
+  }
+
+  S.forEach(function(s,k){
+    var b=document.createElement('button'); b.className='g';
+    b.innerHTML='<span>'+String(k+1).padStart(2,'0')+'</span><span class="gt"></span>'+
+                '<span class="ga"></span><span class="gs"></span><span class="gm">'+mmss(parseFloat(s.dataset.min))+'</span>';
+    b.querySelector('.gt').textContent=s.dataset.t;
+    b.querySelector('.ga').textContent=s.dataset.act;
+    b.querySelector('.gs').textContent=s.dataset.sp;
+    b.onclick=function(){ document.body.classList.remove('grid'); show(k); };
+    $('gi').appendChild(b);
+  });
+
+  document.addEventListener('keydown',function(e){
+    var k=e.key;
+    if(k==='ArrowRight'||k==='PageDown'||k===' '){e.preventDefault();show(i+1);}
+    else if(k==='ArrowLeft'||k==='PageUp'){e.preventDefault();show(i-1);}
+    else if(k==='Home'){show(0);} else if(k==='End'){show(S.length-1);}
+    else if(k==='g'||k==='G'){document.body.classList.toggle('grid');}
+    else if(k==='n'||k==='N'){document.body.classList.toggle('notes');}
+    else if(k==='Escape'){document.body.classList.remove('grid');}
+  });
+
+  var m=/^#s(\d+)$/.exec(location.hash);
+  show(m?parseInt(m[1],10)-1:0);
+</script>
