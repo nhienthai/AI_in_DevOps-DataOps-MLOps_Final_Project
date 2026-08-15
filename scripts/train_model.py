@@ -67,6 +67,11 @@ def main():
         default=settings.mlflow_tracking_uri,
         help="MLflow tracking server URI",
     )
+    parser.add_argument(
+        "--apply-cleaning",
+        action="store_true",
+        help="Apply clean_text_vietnamese preprocessing to dataset splits",
+    )
 
     args = parser.parse_args()
 
@@ -76,6 +81,7 @@ def main():
     print(f"=== Starting Training ({args.model_type.upper()}) ===")
     print(f"Dataset: {args.dataset}")
     print(f"Model Name: {args.model_name}")
+    print(f"Apply Cleaning: {args.apply_cleaning}")
     print(f"MLflow URI: {args.mlflow_uri}")
 
     if args.model_type == "baseline":
@@ -90,6 +96,7 @@ def main():
             epochs=args.epochs,
             batch_size=args.batch_size,
             learning_rate=args.lr,
+            apply_cleaning=args.apply_cleaning,
         )
 
     print("=== Training Complete ===")
