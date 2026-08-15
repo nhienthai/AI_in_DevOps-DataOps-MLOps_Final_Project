@@ -1,5 +1,7 @@
 """Application operations endpoint tests."""
 
+import logging
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -147,3 +149,41 @@ def test_request_body_limit_is_typed(monkeypatch: pytest.MonkeyPatch) -> None:
             assert response.headers["x-request-id"] == response.json()["request_id"]
     finally:
         get_settings.cache_clear()
+
+
+def test_inference_failure_is_logged_not_just_counted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A 500 says nothing about why, so the cause has to survive in the log.
+
+    A tokenizer that raised under concurrent load once produced a wall of
+    ``prediction_failed`` responses and an empty log, which made the cause
+    invisible until it was reproduced by hand.
+    """
+
+    class _BrokenPredictor(StubPredictor):
+        """Warms up cleanly, then fails — the shape a concurrency bug takes."""
+
+        version = "broken-1"
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.warmed = False
+
+        def predict(self, texts: object) -> list:
+            if not self.warmed:
+                self.warmed = True
+                return super().predict(list(texts))  # type: ignore[arg-type]
+            raise RuntimeError("Already borrowed")
+
+    def load(_settings: Settings) -> StubPredictor:
+        return _BrokenPredictor()
+
+    with TestClient(create_app(predictor_factory=load), raise_server_exceptions=False) as broken:
+        with caplog.at_level(logging.ERROR, logger="sentiment.serving.app"):
+            response = broken.post("/api/v1/predict", json={"text": "giáo viên dạy hay"})
+
+    assert response.status_code == 500
+    assert response.json()["error_code"] == "prediction_failed"
+    assert "Already borrowed" in caplog.text
+    assert "broken-1" in caplog.text

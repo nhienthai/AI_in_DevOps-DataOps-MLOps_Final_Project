@@ -17,10 +17,12 @@ data/interim/
 *.pt
 *.bin
 *.onnx
-models/
+# Anchored: an unanchored "models/" also ignores src/sentiment/models/, which
+# silently drops new modules added to that package.
+/models/
 *.zip
 *.db
-artifacts/
+/artifacts/
 
 # MLflow
 mlruns/

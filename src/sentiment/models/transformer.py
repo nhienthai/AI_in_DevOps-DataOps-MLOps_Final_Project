@@ -1,6 +1,7 @@
 """XLM-RoBERTa / Transformer Predictor for Vietnamese Sentiment Classification."""
 
 import os
+import threading
 from collections.abc import Sequence
 from typing import Any, List, Optional, cast
 
@@ -9,6 +10,7 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer
 
 from sentiment.config import settings
+from sentiment.models.text_format import InputFormat
 from sentiment.serving.predictor import Prediction, Predictor, SentimentLabel
 
 
@@ -36,9 +38,11 @@ class TransformerPredictor(Predictor):
         model_name_or_path: str = settings.model_name,
         model_version: str = "xlm-roberta-v1.0",
         device: Optional[str] = None,
+        input_format: Optional[InputFormat] = None,
     ):
         self.model_name_or_path = model_name_or_path
         self.version = model_version
+        self.input_format = input_format or InputFormat()
         self.label_map = settings.label_map
         self.rev_label_map = settings.rev_label_map
         self.max_length = settings.max_length
@@ -56,6 +60,14 @@ class TransformerPredictor(Predictor):
             self.device = torch.device("mps")
         else:
             self.device = torch.device("cpu")
+
+        # Hugging Face tokenizers rewrite their own truncation and padding
+        # configuration on every call, so the Rust object cannot be shared across
+        # threads: a second caller lands mid-write and gets ``RuntimeError:
+        # Already borrowed``. The serving runtime deliberately runs inference in a
+        # thread pool, so tokenization is serialised here. The model forward stays
+        # outside the lock, where torch releases the GIL and real overlap happens.
+        self._tokenizer_lock = threading.Lock()
 
         self.tokenizer: Any = None
         self.model: Any = None
@@ -75,25 +87,33 @@ class TransformerPredictor(Predictor):
         self.model.to(self.device)
         self.model.eval()
 
+    def _format(self, texts: Sequence[str]) -> List[str]:
+        """Shape request text into the form this model was trained on."""
+        if self.input_format.is_identity:
+            return list(texts)
+        return [self.input_format.apply(text) for text in texts]
+
     def predict(self, texts: Sequence[str]) -> list[Prediction]:
         """Classify a list of text strings in a single batched pass."""
         if not texts:
             return []
 
-        original_lengths = self.tokenizer(
-            list(texts),
-            add_special_tokens=True,
-            padding=False,
-            truncation=False,
-            return_length=True,
-        )["length"]
-        inputs = self.tokenizer(
-            list(texts),
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
-        ).to(self.device)
+        prepared = self._format(texts)
+        with self._tokenizer_lock:
+            original_lengths = self.tokenizer(
+                prepared,
+                add_special_tokens=True,
+                padding=False,
+                truncation=False,
+                return_length=True,
+            )["length"]
+            inputs = self.tokenizer(
+                prepared,
+                padding=True,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            ).to(self.device)
 
         with torch.no_grad():
             outputs = self.model(**inputs)
@@ -139,10 +159,12 @@ class TransformerPredictor(Predictor):
         save_directory: str,
         model_version: str = "xlm-roberta-v1.0",
         device: Optional[str] = None,
+        input_format: Optional[InputFormat] = None,
     ) -> "TransformerPredictor":
         """Instantiate TransformerPredictor from local weights directory."""
         return cls(
             model_name_or_path=save_directory,
             model_version=model_version,
             device=device,
+            input_format=input_format,
         )

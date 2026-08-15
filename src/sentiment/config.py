@@ -33,11 +33,15 @@ class Settings(BaseSettings):
     low_confidence_threshold: float = Field(default=0.7, ge=0.5, le=1.0)
     drift_window_size: int = Field(default=1_000, ge=30)
 
-    mlflow_tracking_uri: str = "http://localhost:5000"
+    # Host-side default. Compose publishes MLflow on 5001 and overrides this with
+    # the in-network http://mlflow:5000 for the services themselves.
+    mlflow_tracking_uri: str = "http://localhost:5001"
     mlflow_experiment_name: str = "sentiment-amazon-polarity"
     model_registry_name: str = "sentiment-service-xlm-roberta"
     model_stage: str = "Production"
-    predictor_backend: Literal["stub", "registry"] = "stub"
+    predictor_backend: Literal["stub", "registry", "local"] = "stub"
+    # Where ``local`` reads weights from. scripts/setup_local_model.py writes here.
+    local_model_dir: Path = Path("artifacts/xlm-roberta")
     reload_token: str | None = None
     build_revision: str = "unknown"
 

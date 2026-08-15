@@ -18,16 +18,24 @@ misled by the sections below.
 
 | Area | Today | Target |
 |---|---|---|
-| Active model | TF-IDF + LogisticRegression baseline, registry version 2, stage `Production` — macro-F1 **0.7149**, accuracy **0.8629** | Fine-tuned XLM-RoBERTa, macro-F1 ≥ 0.80 |
+| Active model | Fine-tuned PhoBERT-v2 served from disk via `SENTIMENT_PREDICTOR_BACKEND=local` — macro-F1 **0.8457**, accuracy **0.9416**. XLM-RoBERTa (**0.8337**) stays mounted as the alternative; the TF-IDF baseline (**0.7149**) remains registry version 2, now `Archived` | Same model reached through the registry rather than a mounted directory |
 | Fairness | Identity blinding; worst identity-pair delta **0.0000**, gated at promotion and alerted in production | Re-measured on the transformer before it ships |
 | Explanations | LIME live on `/api/v1/explain`; SHAP global logged per training run | unchanged |
 | Training orchestration | `docker compose --profile training up trainer`, or `scripts/train_model.py` | unchanged |
 | Transformer | Trains on Kaggle GPU; **the 200 ms CPU budget is unproven for it** | Measured, or the baseline stays |
 
-Switching the model is a configuration change, not a code change:
-`SENTIMENT_PREDICTOR_BACKEND=registry` loads whatever sits in `Production`, baseline or
-transformer. That boundary was the point of building the skeleton first, and it is now
-exercised rather than theoretical.
+Switching the model is a configuration change, not a code change. The backend setting
+picks where the predictor comes from — `stub` for a deterministic hash, `registry` for
+whatever sits in `Production`, `local` for a Hugging Face directory on disk — and every
+one of them satisfies the same `Predictor` protocol. That boundary was the point of
+building the skeleton first, and it is now exercised rather than theoretical.
+
+`local` exists because the transformer was fine-tuned on Kaggle and arrived as a 1.1 GB
+directory rather than as an MLflow run. Pushing it through the registry would mean
+uploading it once and downloading it into every API container at startup, so instead the
+weights are mounted read-only and the registry holds the lineage — run, metrics,
+evaluation output — with a pointer to where they live. See
+[Serving the fine-tuned XLM-RoBERTa](README.md#serving-the-fine-tuned-xlm-roberta).
 
 ## 1. High-level architecture
 
