@@ -184,16 +184,16 @@
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Class skew vs prior",
-      "description": "Positive share minus 0.5. PredictionSkew fires beyond 0.2 either way. Note this rule assumes a binary prior and will need rewriting per class once the three-class model is promoted.",
+      "title": "Class skew vs 6h baseline",
+      "description": "Positive share over 15m minus the same share over 6h. PredictionSkew fires beyond 0.2 either way. Measured against the service's own recent baseline rather than a fixed prior, because this model serves three classes with neutral at roughly 4% and a deviation-from-0.5 rule fired on healthy traffic.",
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "sentiment-prometheus" },
-          "expr": "sum(rate(ml_predictions_total{label=\"positive\"}[15m])) / clamp_min(sum(rate(ml_predictions_total[15m])), 0.001) - 0.5",
-          "legendFormat": "positive share - prior"
+          "expr": "sum(rate(ml_predictions_total{label=\"positive\"}[15m])) / clamp_min(sum(rate(ml_predictions_total[15m])), 0.001) - sum(rate(ml_predictions_total{label=\"positive\"}[6h])) / clamp_min(sum(rate(ml_predictions_total[6h])), 0.001)",
+          "legendFormat": "positive share - 6h baseline"
         }
       ],
       "fieldConfig": {

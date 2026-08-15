@@ -10,19 +10,48 @@ groups:
           description: "The API is up but no model is loaded; predictions return 503."
           runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#modelnotloaded"
 
+      # Both output-distribution rules are deliberately prior-free.
+      #
+      # The original rule compared the positive share against a hardcoded 0.5,
+      # which only holds for a balanced binary problem. This service now serves
+      # three classes with `neutral` at roughly 4% of the training data, so that
+      # rule fired on healthy traffic. `sentiment.data.validate.check` already
+      # reached the same conclusion for the data layer and replaced its
+      # deviation-from-prior rule with a floor on the rarest class; these two
+      # rules apply that reasoning to the serving layer.
+      #
+      # Neither references a prior constant, so promoting a model trained on a
+      # differently balanced split cannot silently invalidate them again.
+
       - alert: PredictionSkew
         expr: |
           abs(
             sum(rate(ml_predictions_total{label="positive"}[15m]))
               / clamp_min(sum(rate(ml_predictions_total[15m])), 0.001)
-            - 0.5
+            -
+            sum(rate(ml_predictions_total{label="positive"}[6h]))
+              / clamp_min(sum(rate(ml_predictions_total[6h])), 0.001)
           ) > 0.2
         for: 15m
         labels: {severity: warning}
         annotations:
-          summary: "Positive-class rate deviates more than 20pp from the training prior"
-          description: "Positive share has drifted to {{ $value | humanizePercentage }} away from 0.5."
+          summary: "Positive-class share moved more than 20pp against this service's own 6h baseline"
+          description: "The 15m positive share differs from the 6h share by {{ $value | humanizePercentage }}."
           runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#predictionskew"
+
+      - alert: PredictionClassCollapse
+        expr: |
+          (
+            sum by (label) (rate(ml_predictions_total[15m]))
+              / scalar(clamp_min(sum(rate(ml_predictions_total[15m])), 0.001))
+          ) < 0.02
+          and on() sum(rate(ml_predictions_total[15m])) > 0.01
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Class {{ $labels.label }} has all but disappeared from predictions"
+          description: "{{ $labels.label }} is {{ $value | humanizePercentage }} of predictions, under the 2% floor. A class the model can no longer emit makes macro-F1 meaningless, which is the same failure the data quality gate guards against with min_class_share."
+          runbook_url: "https://github.com/nhienthai/AI_in_DevOps-DataOps-MLOps_Final_Project/blob/main/docs/user-guide.md#predictionclasscollapse"
 
       - alert: DriftDetected
         expr: ml_drift_psi > 0.2

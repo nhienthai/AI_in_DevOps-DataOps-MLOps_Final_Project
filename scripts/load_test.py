@@ -15,8 +15,13 @@ just to make the request counter move:
     Inputs far longer than the training reference. Moves ``ml_drift_psi`` toward
     and past 0.2, which fires ``DriftDetected`` after ten minutes.
 ``skew``
-    One-sided sentiment. Pushes the positive share away from the prior and fires
-    ``PredictionSkew`` after fifteen minutes.
+    One-sided sentiment. Starves the other two classes, which fires
+    ``PredictionClassCollapse`` after fifteen minutes, and moves the positive
+    share away from the service's 6h baseline, which fires ``PredictionSkew``.
+    Run ``steady`` first, or use ``--scenario all``: both rules compare against
+    measured history rather than a fixed prior, so on a stack that has only just
+    started there is no baseline to deviate from and ``PredictionSkew`` stays
+    quiet. ``PredictionClassCollapse`` fires either way.
 ``errors``
     Deliberately invalid requests. Fills the 4xx band and the per-``error_type``
     panel without touching the 5xx rate, which is the distinction

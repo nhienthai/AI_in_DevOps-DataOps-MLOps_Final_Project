@@ -250,16 +250,24 @@ you sort the registry out.
 
 ## PredictionSkew
 
-**Fired:** the positive-class share drifted more than 20 percentage points from 0.5,
-sustained 15 minutes. Severity **warning**.
+**Fired:** the positive-class share over the last 15 minutes differs by more than 20
+percentage points from the same share over the last 6 hours, sustained 15 minutes.
+Severity **warning**.
 
 The output distribution has moved even though the model has not. That is either a real
 change in traffic or a broken model.
 
-**Known limitation:** this rule compares against a 0.5 binary prior, while the model
-serves three classes with a heavily under-represented `neutral`. It will need
-rewriting per-class when the real model is promoted — tracked with the dataset
-reconciliation in W2-04.
+The comparison is against this service's own 6-hour baseline, not a fixed prior. An
+earlier version of this rule compared against 0.5, which only holds for a balanced
+binary problem; this model serves three classes with `neutral` at roughly 4%, so that
+version fired on healthy traffic. Because the baseline is measured rather than
+declared, promoting a model trained on a differently balanced split cannot silently
+invalidate the rule.
+
+**One consequence to know before a demo:** on a stack that has only just started, the
+6-hour window and the 15-minute window see the same traffic, so the rule cannot fire.
+Run `scripts/load_test.py --scenario steady` first to establish a baseline, then
+`--scenario skew`. `--scenario all` already does this in the right order.
 
 **Likely causes:** genuinely shifted traffic (a campaign, a seasonal event, one large
 client); an upstream change sending a filtered subset; a mislabelled checkpoint mapping
@@ -274,6 +282,40 @@ curl -s localhost:8000/api/v1/model/info    # has model_version changed recently
 
 Skew *with* rising PSI points at the inputs. Skew with flat PSI, right after a
 deployment, points at the model.
+
+## PredictionClassCollapse
+
+**Fired:** one class fell below 2% of all predictions while traffic was still flowing,
+sustained 15 minutes. The alert label `label` names the class. Severity **warning**.
+
+This is the serving counterpart of the data quality gate's `min_class_share` rule. A
+model that can no longer emit a class is not a model with a slightly worse score — its
+macro-F1 stops meaning anything, because one of the three classes contributes nothing.
+`neutral` is the class to watch: it is only about 4% of the training data, so it is the
+first to disappear when a checkpoint, a threshold, or a label mapping goes wrong.
+
+The 2% floor is half the expected `neutral` share, matching `min_class_share=0.02` in
+`sentiment.data.validate.check`. The threshold is deliberately the same number in both
+places so a class vanishing is caught whether it happens in training data or in live
+predictions.
+
+**Likely causes:** a checkpoint mapping class ids to the wrong labels; a promoted model
+trained on a split where the rare class was already thin; a decision threshold that
+makes the middle class unreachable; genuinely one-sided traffic (a load test with
+`--scenario skew` will trip this deliberately).
+
+```bash
+curl -s -G localhost:9090/api/v1/query --data-urlencode \
+  'query=sum(rate(ml_predictions_total[1h])) by (label)'
+curl -s localhost:8000/api/v1/model/info    # which model_version is serving?
+curl -s -X POST localhost:8000/api/v1/predict \
+  -H 'content-type: application/json' \
+  -d '{"text":"Môn học bình thường, không có gì đặc biệt."}'
+```
+
+If a deliberately neutral input never scores `neutral`, the problem is the model or its
+label mapping, not the traffic. Roll back per *Rolling back to a previous model
+version* and re-check.
 
 ## DriftDetected
 
