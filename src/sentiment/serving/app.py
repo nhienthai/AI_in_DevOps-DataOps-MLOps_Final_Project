@@ -149,13 +149,23 @@ def _prediction_response(
 
 
 def _default_explainer_factory(predictor: Predictor) -> Explainer | None:
-    """Build a LIME explainer for ``predictor``, or None when unavailable."""
+    """Build a LIME explainer for ``predictor``, or None when unavailable.
+
+    ``batch_size`` matters as much as ``num_samples``: without it LIME hands the
+    model every perturbation in a single call, which is both larger than any
+    batch ``/predict/batch`` accepts and, on a transformer, minutes of work.
+    """
     try:
         from sentiment.responsible.explain import LimeExplainer
     except ImportError:
         logger.warning("lime is not installed; POST /api/v1/explain will report 501")
         return None
-    return LimeExplainer(predictor)
+    explainer_settings = get_settings()
+    return LimeExplainer(
+        predictor,
+        num_samples=explainer_settings.explain_num_samples,
+        batch_size=explainer_settings.max_batch_size,
+    )
 
 
 def _resolve_explainer(app: FastAPI) -> Explainer | None:
@@ -199,6 +209,7 @@ def create_app(
         runtime = InferenceRuntime(settings, load_predictor, _BOOTSTRAP_REFERENCE)
         app.state.runtime = runtime
         app.state.explainer = explainer
+        app.state.explain_slots = asyncio.Semaphore(settings.max_concurrent_explanations)
         app.state.explainer_factory = build_explainer
         app.state.explainer_cache = None
         await runtime.start()
@@ -341,9 +352,30 @@ def create_app(
                 "explainer_not_available",
                 "No explainer is available for the active model.",
             )
-        explanation = await asyncio.to_thread(
-            active_explainer.explain, payload.text, payload.method
-        )
+        # One explanation is num_samples model calls, so it cannot be admitted on
+        # the same terms as a single prediction. Its own semaphore keeps parallel
+        # explanations from multiplying that cost — six concurrent requests once
+        # cost eight minutes of CPU with nothing rejected — and the timeout stops
+        # a client waiting on work that will not finish in any useful time.
+        explain_slots: asyncio.Semaphore = request.app.state.explain_slots
+        if explain_slots.locked():
+            PREDICTION_ERRORS.labels(
+                error_type="explain_overloaded", model_version=_model_version(runtime)
+            ).inc()
+            raise APIError(429, "explain_overloaded", "Explanation capacity is full.")
+        async with explain_slots:
+            try:
+                explanation = await asyncio.wait_for(
+                    asyncio.to_thread(active_explainer.explain, payload.text, payload.method),
+                    timeout=settings.explain_timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                PREDICTION_ERRORS.labels(
+                    error_type="explain_timeout", model_version=_model_version(runtime)
+                ).inc()
+                raise APIError(
+                    504, "explain_timeout", "Explanation exceeded its time limit."
+                ) from exc
         return ExplainResponse(
             method=explanation.method,
             label=explanation.label,

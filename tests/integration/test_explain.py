@@ -1,7 +1,9 @@
 """M3's explanation endpoint and M5 integration boundary tests."""
 
+import pytest
 from fastapi.testclient import TestClient
 
+from sentiment.config import get_settings
 from sentiment.serving.app import create_app
 from sentiment.serving.predictor import Explanation, TokenAttribution
 
@@ -86,3 +88,68 @@ def test_explain_validates_text_before_calling_explainer() -> None:
         oversized = client.post("/api/v1/explain", json={"text": "x" * 5_001})
         assert oversized.status_code == 413
         assert oversized.json()["error_code"] == "text_too_long"
+
+
+def test_second_concurrent_explanation_is_rejected() -> None:
+    """One /explain is many model calls, so they must not pile up.
+
+    Six concurrent explanations once cost eight minutes of CPU with every one of
+    them answered 200, because /explain bypassed the admission control that
+    /predict goes through.
+    """
+    import threading
+
+    release = threading.Event()
+    started = threading.Event()
+
+    class _SlowExplainer:
+        def explain(self, text: str, method: str = "lime") -> Explanation:
+            started.set()
+            release.wait(timeout=5)
+            return Explanation(
+                method="lime",
+                label="positive",
+                score=0.9,
+                attributions=(TokenAttribution(token="hay", attribution=0.5),),
+            )
+
+    with TestClient(create_app(explainer=_SlowExplainer())) as slow_client:
+        results: list[int] = []
+
+        def call() -> None:
+            results.append(
+                slow_client.post("/api/v1/explain", json={"text": "giáo viên dạy hay"}).status_code
+            )
+
+        first = threading.Thread(target=call)
+        first.start()
+        assert started.wait(timeout=5), "first explanation never started"
+
+        second = slow_client.post("/api/v1/explain", json={"text": "môn học chán"})
+        assert second.status_code == 429
+        assert second.json()["error_code"] == "explain_overloaded"
+
+        release.set()
+        first.join(timeout=10)
+        assert results == [200]
+
+
+def test_explanation_that_overruns_its_budget_times_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import time
+
+    class _HangingExplainer:
+        def explain(self, text: str, method: str = "lime") -> Explanation:
+            time.sleep(5)
+            raise AssertionError("should have been abandoned")
+
+    monkeypatch.setenv("SENTIMENT_EXPLAIN_TIMEOUT_SECONDS", "0.2")
+    get_settings.cache_clear()
+    try:
+        with TestClient(create_app(explainer=_HangingExplainer())) as slow_client:
+            response = slow_client.post("/api/v1/explain", json={"text": "giáo viên dạy hay"})
+        assert response.status_code == 504
+        assert response.json()["error_code"] == "explain_timeout"
+    finally:
+        get_settings.cache_clear()
