@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     inference_timeout_seconds: float = Field(default=30.0, gt=0)
     queue_timeout_seconds: float = Field(default=1.0, gt=0)
     warmup_text: str = "Service warm-up review."
+    # LIME turns one /explain into this many model calls. 500 is stable but costs
+    # ~80s on a two-core transformer deployment; at 150 the top tokens measured
+    # identical on the demo sentence for a third of the work.
+    explain_num_samples: int = Field(default=150, ge=10, le=5_000)
+    explain_timeout_seconds: float = Field(default=60.0, gt=0)
+    max_concurrent_explanations: int = Field(default=1, gt=0, le=16)
     low_confidence_threshold: float = Field(default=0.7, ge=0.5, le=1.0)
     drift_window_size: int = Field(default=1_000, ge=30)
 

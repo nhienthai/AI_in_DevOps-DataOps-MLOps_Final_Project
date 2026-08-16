@@ -288,10 +288,10 @@
       </figure>
       <div style="display:grid;gap:12px">
         <div class="stats" style="grid-template-columns:1fr 1fr">
-          <div class="stat"><span class="stat__v">0.8629</span><span class="stat__l">accuracy</span></div>
-          <div class="stat stat--warn"><span class="stat__v">0.7149</span><span class="stat__l">macro-F1</span></div>
+          <div class="stat"><span class="stat__v">0.9416</span><span class="stat__l">accuracy</span></div>
+          <div class="stat stat--warn"><span class="stat__v">0.6233</span><span class="stat__l">F1 on <code>neutral</code></span></div>
         </div>
-        <p class="sm">Accuracy is carried by the two large classes. Macro-F1 weights <code>neutral</code> equally with them — so <strong>a model can look 86% right and be poor at a third of the label space.</strong></p>
+        <p class="sm">Both numbers are the <strong>deployed</strong> model's, on the same 3,166-row test split. Accuracy is carried by the two large classes — <code>negative</code> 0.956 and <code>positive</code> 0.958. Macro-F1 weights <code>neutral</code> equally with them and lands at <b>0.8457</b>, so <strong>a model can look 94% right and still be mediocre on a third of the label space.</strong></p>
       </div>
     </div>
     <div class="l-triad">
@@ -312,9 +312,9 @@
       <dl class="spec">
         <dt>services</dt><dd><b>6</b> — api · postgres · mlflow · prometheus · alertmanager · grafana, every one with a health check</dd>
         <dt>api</dt><dd>FastAPI + uvicorn, versioned at <code>/api/v1</code>, OpenAPI 3.1 with examples on <b>12/12</b> schemas</dd>
-        <dt>model</dt><dd>TF-IDF + LogisticRegression, registry version <b>2</b>, stage <b>Production</b></dd>
-        <dt>limits</dt><dd>batch <b>64</b> · text <b>5,000</b> chars · body <b>1 MB</b> · <b>2</b> concurrent inferences</dd>
-        <dt>budgets</dt><dd>queue <b>1s</b> · inference <b>30s</b> · p95 target <b>200 ms</b></dd>
+        <dt>model</dt><dd>PhoBERT-v2 fine-tuned on UIT-VSFC, served from disk, registry version <b>5</b>, stage <b>Production</b></dd>
+        <dt>limits</dt><dd>batch <b>64</b> · text <b>5,000</b> chars · body <b>1 MB</b> · <b>2</b> concurrent inferences · <b>1</b> concurrent explanation</dd>
+        <dt>budgets</dt><dd>queue <b>1s</b> · inference <b>30s</b> · explanation <b>60s</b> · p95 target <b>200 ms</b>, measured <b>98 ms</b> over 150 requests</dd>
         <dt>image</dt><dd>multi-stage, non-root UID 1000, base pinned by digest, no <code>pip</code> in the runtime layer</dd>
       </dl>
       <div style="display:grid;gap:12px">
@@ -322,7 +322,7 @@
           <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">20</span><span class="stat__l">metrics</span></div>
           <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">10</span><span class="stat__l">alerts</span></div>
           <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">3</span><span class="stat__l">dashboards</span></div>
-          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">159</span><span class="stat__l">tests</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">202</span><span class="stat__l">tests</span></div>
         </div>
         <div class="card card--go">
           <h3>the boundary that paid off</h3>
@@ -330,7 +330,7 @@
         </div>
         <div class="card">
           <h3>what is not built</h3>
-          <p>The fine-tuned transformer. It trains and satisfies the serving contract, but no checkpoint has been promoted — so every model number in this deck is the baseline's.</p>
+          <p>Registry-served weights. The transformers are <strong>mounted from disk</strong>, not downloaded from MLflow — the registry holds their lineage and a pointer, not 500 MB of tensors. And the deployed model ships <strong>no drift reference</strong>, so <code>DriftDetected</code> currently fires on a placeholder baseline.</p>
         </div>
       </div>
     </div>
@@ -510,7 +510,7 @@
       <table>
         <thead><tr><th>Decision</th><th>Chosen</th><th>Rejected</th><th>What it cost us</th></tr></thead>
         <tbody>
-          <tr class="pick"><td class="k">Model</td><td class="k">XLM-RoBERTa + TF-IDF baseline</td><td>DistilBERT · PhoBERT</td><td>DistilBERT is English-only, so not a candidate. XLM-R is ~4× larger — <strong>the 200 ms CPU budget is now an open risk, not a settled property</strong>. PhoBERT would likely score better on Vietnamese but gives up the multilingual claim.</td></tr>
+          <tr class="pick"><td class="k">Model</td><td class="k">PhoBERT-v2</td><td>XLM-RoBERTa · DistilBERT · TF-IDF</td><td>DistilBERT is English-only. We fine-tuned XLM-R first and PhoBERT second, then measured both on the same split: <strong>0.8457 vs 0.8337 macro-F1</strong>, and PhoBERT is half the size. The multilingual claim is what we gave up. The 200 ms budget survived: p95 <strong>98 ms</strong> on two CPUs.</td></tr>
           <tr><td class="k">Drift measure</td><td class="k">PSI on input length</td><td>KS test · KL · Evidently</td><td>PSI has a conventional reading (&lt;0.1 / 0.1–0.2 / &gt;0.2), so the threshold is arguable rather than invented. It is coarser than KS.</td></tr>
           <tr><td class="k">Fairness method</td><td class="k">Identity-pair probe (EEC)</td><td>Group-wise metrics · Fairlearn</td><td>The corpus has no demographic columns, so group metrics are impossible. The probe measures the model, not the population — a real limitation.</td></tr>
           <tr><td class="k">Metrics</td><td class="k">In-process <code>prometheus_client</code></td><td>Sidecar exporter · StatsD</td><td>Drift and confidence are functions of the prediction, so a sidecar would mean shipping predictions to a second process. Cost: the API owns its own instrumentation.</td></tr>
@@ -595,6 +595,7 @@
             <tr><td class="k">fairness gap</td><td class="n">≤ 0.10</td><td class="n">0.0000</td><td><span class="pill pill--go">pass</span></td><td>bias shipping because nobody re-measured</td></tr>
           </tbody>
         </table>
+        <p class="sm">These four are the <strong>baseline's</strong>, the model this gate promoted. The PhoBERT now serving was measured on the same split — macro-F1 <b>0.8457</b>, p95 <b>98 ms</b> — but it was <strong>imported, not gated</strong>: it arrived as weights from a notebook, and its fairness gap has never been measured. Running the gate against it is the honest next step, and we are not claiming it passed one.</p>
       </div>
       <div class="card card--go">
         <h3>rollback</h3>
@@ -742,18 +743,18 @@
       <table>
         <thead><tr><th>Category</th><th class="n">Tests</th><th>The question it answers</th><th>What it caught in practice</th></tr></thead>
         <tbody>
-          <tr><td class="k">unit</td><td class="n">47</td><td>Does this function do what its docstring says?</td><td>A blank reload token must disable the endpoint, not set an empty secret</td></tr>
+          <tr><td class="k">unit</td><td class="n">49</td><td>Does this function do what its docstring says?</td><td>A blank reload token must disable the endpoint, not set an empty secret</td></tr>
           <tr><td class="k">data quality</td><td class="n">21</td><td>Would bad data reach training?</td><td>The gate must fail a split whose rarest class collapses to 0.5%</td></tr>
-          <tr><td class="k">model</td><td class="n">30</td><td>Does the model satisfy its contract, and is it any good?</td><td class="k">The blinding flag lost in a joblib round-trip</td></tr>
-          <tr><td class="k">responsible AI</td><td class="n">32</td><td>Do the fairness instruments measure what they claim?</td><td class="k">A probe that returns zero for everything would look like a fair model</td></tr>
-          <tr><td class="k">integration</td><td class="n">29</td><td>Does the assembled HTTP surface behave end to end?</td><td>Unicode and emoji survive the round trip; a bad batch item is isolated</td></tr>
+          <tr><td class="k">model</td><td class="n">65</td><td>Does the model satisfy its contract, and is it any good?</td><td class="k">The blinding flag lost in a joblib round-trip; a tokenizer that breaks on the second thread</td></tr>
+          <tr><td class="k">responsible AI</td><td class="n">35</td><td>Do the fairness instruments measure what they claim?</td><td class="k">A probe that returns zero for everything would look like a fair model</td></tr>
+          <tr><td class="k">integration</td><td class="n">32</td><td>Does the assembled HTTP surface behave end to end?</td><td>Unicode and emoji survive the round trip; a bad batch item is isolated; a second explanation is shed rather than queued</td></tr>
         </tbody>
       </table>
     </div>
     <div class="l-triad">
       <div class="stats" style="grid-template-columns:1fr 1fr">
         <div class="stat stat--go"><span class="stat__v">91%</span><span class="stat__l">coverage · 85% gate</span></div>
-        <div class="stat"><span class="stat__v">159</span><span class="stat__l">total</span></div>
+        <div class="stat"><span class="stat__v">202</span><span class="stat__l">total</span></div>
       </div>
       <div class="card card--warn">
         <h3>coverage was a lie, briefly</h3>
@@ -772,7 +773,7 @@
 <section class="slide" data-sp="Huỳnh" data-act="Deep dive" data-min="1" data-t="Drift, and the reference that makes it mean something">
   <div class="wrap">
     <div class="eyebrow">11 · Deep dive · <em>monitoring</em></div>
-    <h2>The reference travels with the model</h2>
+    <h2>The reference has to travel with the model</h2>
     <div class="l-fig-notes">
       <figure>
         <svg viewBox="0 0 560 196" role="img" aria-label="PSI compares the live input-length histogram against a reference logged beside the model at training time. Below 0.1 stable, 0.1 to 0.2 moderate, above 0.2 fires DriftDetected.">
@@ -816,8 +817,8 @@
         <div class="code"><span class="d">$</span> curl :9093/api/v2/alerts<br><b>DriftDetected</b> warning <span class="go">active</span></div>
         <p class="sm"><strong>Driven to <code>FIRING</code> for real</strong> with <code>load_test.py --scenario drift</code>, and confirmed received by Alertmanager — not just “the expression looks right”.</p>
         <div class="card card--stop">
-          <h3>what we cannot demonstrate</h3>
-          <p><code>HighLatencyP95</code> has <strong>never</strong> been observed firing. The baseline answers in 0.42 ms, so no concurrency this stack can generate reaches 500 ms. Verified by inspection only.</p>
+          <h3>where it currently lies</h3>
+          <p>The transformer we deployed <strong>shipped without a reference</strong>, so serving falls back to a placeholder distribution and PSI reads around <b>6</b> on perfectly normal traffic. The alert is real, the number is meaningless — the reference has to be rebuilt for the new model before it measures anything.</p>
         </div>
       </div>
     </div>
@@ -941,11 +942,11 @@
     <h2>The model reads the concession</h2>
     <div class="l-aside-main">
       <div class="code">
-        <span class="d">"Giáo viên dạy rất hay nhưng<br>&nbsp;tài liệu thì sơ sài."</span><br><br>
-        rất &nbsp;&nbsp;&nbsp;&nbsp;<span class="go">+0.30</span><br>
-        hay &nbsp;&nbsp;&nbsp;&nbsp;<span class="go">+0.26</span><br>
-        nhưng &nbsp;&nbsp;<span class="no">−0.19</span><br>
-        thì &nbsp;&nbsp;&nbsp;&nbsp;<span class="no">−0.16</span><br><br>
+        <span class="d">"Giáo viên dạy rất hay nhưng<br>&nbsp;tài liệu sơ sài."</span><br><br>
+        nhưng &nbsp;&nbsp;<span class="no">−0.33</span><br>
+        rất &nbsp;&nbsp;&nbsp;&nbsp;<span class="go">+0.18</span><br>
+        hay &nbsp;&nbsp;&nbsp;&nbsp;<span class="go">+0.12</span><br>
+        sơ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="no">−0.10</span><br><br>
         → <b>negative</b><br><span class="d">live, /api/v1/explain</span>
       </div>
       <div style="display:grid;gap:11px">
@@ -972,10 +973,10 @@
     <div class="l-main-aside">
       <div class="code">
         <span class="d">1</span> docker compose ps <span class="d">………………… six healthy services</span><br>
-        <span class="d">2</span> curl /api/v1/model/info <span class="d">………… v2 · Production · fairness_delta 0.0</span><br>
-        <span class="d">3</span> curl /api/v1/predict <span class="d">……………… one positive, one negative</span><br>
+        <span class="d">2</span> curl /api/v1/model/info <span class="d">………… phobert · v5 · Production</span><br>
+        <span class="d">3</span> curl /api/v1/predict <span class="d">……………… positive · negative · neutral</span><br>
         <span class="d">4</span> curl /api/v1/predict/batch <span class="d">……… empty item isolated, batch survives</span><br>
-        <span class="d">5</span> curl /api/v1/explain <span class="d">……………… live token attributions</span><br>
+        <span class="d">5</span> curl /api/v1/explain <span class="d">……………… token attributions · 15–20s, wait for it</span><br>
         <span class="d">6</span> Grafana → Sentiment <span class="d">………………… three dashboards, populated</span><br>
         <span class="d">7</span> load_test.py --scenario drift <span class="d">…… DriftDetected goes pending</span>
       </div>
@@ -983,7 +984,8 @@
         <div class="card card--stop">
           <h3>rules we do not break</h3>
           <p><strong>Pre-warm the stack.</strong> Never <code>up --build</code> in front of the room.</p>
-          <p style="margin-top:5px"><strong>macOS: AirPlay Receiver off.</strong> It binds port 5000 and makes MLflow answer 403 while being perfectly healthy.</p>
+          <p style="margin-top:5px"><strong>MLflow is on 5001.</strong> Port 5000 belongs to macOS AirPlay Receiver, which answers 403 while MLflow is perfectly healthy — so the stack publishes 5001 and nobody has to change a machine setting.</p>
+          <p style="margin-top:5px"><strong>Start with <code>API_CPU_LIMIT=6.0</code>.</strong> On two CPUs one explanation takes 15–20 s; on six it takes about 4 s. Command 5 is the only one that makes the room wait.</p>
         </div>
         <div class="card">
           <h3>handover</h3>
@@ -1010,6 +1012,8 @@
           <tr><td class="k">Coverage over ¼ of the package</td><td>The omit list hid four modules</td><td>Narrowed; the real figure is 91%</td></tr>
           <tr><td class="k">Train/serve skew on a flag</td><td class="k">The promotion gate — not code review</td><td>The flag travels in the artifact; regression test</td></tr>
           <tr><td class="k">CI stricter than <code>make typecheck</code></td><td class="k">A type error passed review and broke the build</td><td>One file pins the toolchain</td></tr>
+          <tr><td class="k">Serving a model the shape it was never trained on</td><td class="k">Re-measuring the new model instead of trusting its notebook</td><td>PhoBERT trains on <code>Chủ đề: … | …</code>; fed raw text it scores <b>0.7956</b> — <em>worse</em> than the model it replaced. The transform now travels in the model directory</td></tr>
+          <tr><td class="k">A tokenizer that cannot be shared across threads</td><td class="k">A load test — every unit test passed</td><td>Two parallel requests made all but one return <b>500</b>. Tokenization is now locked; a regression test runs four threads</td></tr>
         </tbody>
       </table>
     </div>
@@ -1017,10 +1021,10 @@
       <div class="callout"><p class="kicker">Each one is now a test or a config change — not a lesson we are trusting ourselves to remember.</p></div>
       <div class="card">
         <h3>the pattern</h3>
-        <p>Three of the five were caught by <strong>a gate or a build</strong>, not by a person reading a diff. That is the argument for the whole architecture: humans miss things, so the system has to be the one that does not.</p>
+        <p>Four of the seven were caught by <strong>a gate, a build, a load test or a re-measurement</strong> — not by a person reading a diff. That is the argument for the whole architecture: humans miss things, so the system has to be the one that does not. The last two are the sharpest: both models <em>looked</em> fine to every unit test we had.</p>
       </div>
     </div>
-    <div class="notes"><b>0:45.</b> Do not skip. It pre-empts half the hostile questions, and “caught by the gate, not by review” is the sentence that proves the design works.</div>
+    <div class="notes"><b>0:45.</b> Do not skip. It pre-empts half the hostile questions, and “caught by the gate, not by review” is the sentence that proves the design works. The last two rows are the strongest — a 500-under-load bug and a silent accuracy loss, both invisible to unit tests.</div>
   </div>
 </section>
 
@@ -1030,20 +1034,20 @@
     <div class="eyebrow">17 · Close</div>
     <h2>What is deployed, and what is honest</h2>
     <div class="stats">
-      <div class="stat stat--go"><span class="stat__v">0.0000</span><span class="stat__l">identity gap</span></div>
-      <div class="stat"><span class="stat__v">0.7149</span><span class="stat__l">macro-F1</span></div>
-      <div class="stat"><span class="stat__v">0.8629</span><span class="stat__l">accuracy</span></div>
+      <div class="stat"><span class="stat__v">0.8457</span><span class="stat__l">macro-F1</span></div>
+      <div class="stat"><span class="stat__v">0.9416</span><span class="stat__l">accuracy</span></div>
+      <div class="stat"><span class="stat__v">98 ms</span><span class="stat__l">p95 latency</span></div>
       <div class="stat"><span class="stat__v">91%</span><span class="stat__l">coverage</span></div>
       <div class="stat"><span class="stat__v">10</span><span class="stat__l">alerts + runbooks</span></div>
     </div>
     <div class="l-split">
       <div class="card card--go">
         <h3>deployed</h3>
-        <p>A gated, monitored, explainable service. The model in <code>Production</code> got there <strong>by rule</strong>, and every prediction traces back to an MLflow run carrying its params, its data fingerprint and its fairness measurement.</p>
+        <p>A monitored, explainable service serving a fine-tuned transformer that <strong>beat the baseline by 13 points of macro-F1 and still fits the 200 ms budget</strong>. Every prediction traces back to an MLflow run carrying its params and its data fingerprint, and swapping the model is one environment variable.</p>
       </div>
       <div class="card card--stop">
-        <h3>not yet — and possibly never</h3>
-        <p>The XLM-RoBERTa fine-tune. If it beats the baseline on quality and misses the CPU latency budget, <strong>the honest outcome is to keep the baseline and say so</strong>. The registry makes that a one-line decision rather than a rewrite.</p>
+        <h3>honest gaps</h3>
+        <p>The deployed transformer was <strong>imported, not gated</strong> — its fairness gap is unmeasured, so <code>FairnessUnmeasured</code> fires by design rather than being silenced. It ships no drift reference, so <code>DriftDetected</code> is currently measuring against a placeholder. Both are one script away, and neither is hidden behind a green dashboard.</p>
       </div>
     </div>
     <p class="lead">Questions.</p>

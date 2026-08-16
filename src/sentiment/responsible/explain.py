@@ -51,6 +51,7 @@ class LimeExplainer:
         num_features: int = DEFAULT_NUM_FEATURES,
         num_samples: int = DEFAULT_NUM_SAMPLES,
         random_state: int = 42,
+        batch_size: int | None = None,
     ) -> None:
         """Build an explainer bound to one predictor.
 
@@ -61,12 +62,18 @@ class LimeExplainer:
             num_samples: Perturbations LIME evaluates. Higher is more stable and
                 linearly more expensive, since every sample is a model call.
             random_state: Seed, so the same input yields the same explanation.
+            batch_size: Largest batch handed to the model at once. ``None`` keeps
+                LIME's own behaviour of one call for every perturbation, which is
+                fine for the TF-IDF baseline and ruinous for a transformer: it
+                sends ``num_samples`` texts in a single call, larger than any
+                batch ``/predict/batch`` would accept.
         """
         from lime.lime_text import LimeTextExplainer
 
         self.predictor = predictor
         self.num_features = num_features
         self.num_samples = num_samples
+        self.batch_size = batch_size
         self._explainer = LimeTextExplainer(
             class_names=["not_positive", "positive"],
             random_state=random_state,
@@ -77,9 +84,14 @@ class LimeExplainer:
         """Return an ``(n, 2)`` array of [1 - score, score] for LIME."""
         import numpy as np
 
-        predictions = self.predictor.predict(list(texts))
-        scores = np.asarray([prediction.score for prediction in predictions], dtype=float)
-        return np.column_stack([1.0 - scores, scores])
+        pending = list(texts)
+        step = self.batch_size or len(pending) or 1
+        scores: list[float] = []
+        for start in range(0, len(pending), step):
+            predictions = self.predictor.predict(pending[start : start + step])
+            scores.extend(prediction.score for prediction in predictions)
+        array = np.asarray(scores, dtype=float)
+        return np.column_stack([1.0 - array, array])
 
     def explain(self, text: str, method: Literal["lime"] = "lime") -> Explanation:
         """Explain one prediction.
