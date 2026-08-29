@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sentiment Service — test console</title>
+<style>
+  :root{
+    --paper:#FBFAF7; --paper-2:#F3F2ED; --hair:#DAD8CF; --hair-2:#BCB9AD;
+    --ink:#131519; --ink-2:#494C56; --ink-mid:#83858F;
+    --accent:#2C4A5C; --accent-bg:#E5ECF0;
+    --stop:#AF3629; --stop-bg:#F8E4E1;
+    --go:#1D6849; --go-bg:#E2EFE8;
+    --warn:#8A6410; --warn-bg:#F6EEDC;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 20px 60px}
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;
+         border-bottom:1px solid var(--hair);padding-bottom:14px;margin-bottom:22px}
+  h1{font:600 21px/1.2 var(--mono);margin:0;letter-spacing:-.02em}
+  h2{font:600 15px/1.2 var(--mono);margin:0 0 12px;letter-spacing:-.01em}
+  .sub{color:var(--ink-mid);font-size:13px}
+  section{border:1px solid var(--hair);background:#fff;border-radius:3px;padding:18px;margin-bottom:18px}
+  label{display:block;font:600 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;
+        color:var(--ink-mid);margin-bottom:6px}
+  textarea,input[type=text],select{width:100%;font:inherit;padding:9px 11px;border:1px solid var(--hair-2);
+        border-radius:3px;background:#fff;color:var(--ink)}
+  textarea{min-height:76px;resize:vertical}
+  button{font:600 13px/1 inherit;padding:10px 16px;border:1px solid var(--accent);border-radius:3px;
+         background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:#fff;color:var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+  .stat{border:1px solid var(--hair);border-radius:3px;padding:10px 12px;background:var(--paper)}
+  .stat b{display:block;font:600 19px/1.1 var(--mono);letter-spacing:-.02em;
+          overflow-wrap:anywhere;word-break:break-word}
+  .stat span{font:11px/1.3 var(--mono);color:var(--ink-mid);text-transform:uppercase;letter-spacing:.05em}
+  .pill{display:inline-block;font:600 11px/1 var(--mono);padding:4px 8px;border-radius:2px;letter-spacing:.04em}
+  .p-pos{background:var(--go-bg);color:var(--go)}
+  .p-neg{background:var(--stop-bg);color:var(--stop)}
+  .p-neu{background:var(--paper-2);color:var(--ink-2)}
+  .note{border-left:2px solid var(--accent);background:var(--accent-bg);padding:9px 12px;
+        font-size:13px;color:var(--ink-2);border-radius:0 3px 3px 0}
+  .note.warn{border-color:var(--warn);background:var(--warn-bg)}
+  .note.bad{border-color:var(--stop);background:var(--stop-bg)}
+  .bar{height:6px;background:var(--paper-2);border-radius:3px;overflow:hidden;margin-top:10px}
+  .bar>div{height:100%;background:var(--accent);width:0;transition:width .2s}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:12px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--hair);vertical-align:top}
+  th{font:600 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ink-mid)}
+  td.n{text-align:right;font-family:var(--mono);white-space:nowrap}
+  .scroll{max-height:440px;overflow:auto;border:1px solid var(--hair);border-radius:3px;margin-top:12px}
+  .scroll table{margin:0}
+  .scroll thead th{position:sticky;top:0;background:#fff;box-shadow:0 1px 0 var(--hair)}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px}
+  .muted{color:var(--ink-mid);font-size:13px}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Sentiment Service — test console</h1>
+    <div class="sub">Trang này chạy hoàn toàn trong trình duyệt và gọi API công khai. File CSV
+      <b>không rời khỏi máy bạn</b> — chỉ phần text được gửi qua <code>/api/v1/predict/batch</code>.</div>
+  </div>
+  <div class="row" style="margin:0">
+    <a href="/docs"><button class="ghost" type="button">Swagger</button></a>
+    <button class="ghost" type="button" id="refresh">Tải lại model</button>
+  </div>
+</header>
+
+<section>
+  <h2>Model đang phục vụ</h2>
+  <div class="grid" id="modelStats"><div class="muted">đang tải…</div></div>
+  <div id="modelWarn"></div>
+</section>
+
+<section>
+  <h2>Thử một câu</h2>
+  <label for="one">Câu cần phân loại</label>
+  <textarea id="one" placeholder="giáo viên dạy rất hay nhưng tài liệu sơ sài">giáo viên dạy rất hay nhưng tài liệu sơ sài</textarea>
+  <div class="row">
+    <button type="button" id="btnOne">Phân loại</button>
+    <button type="button" class="ghost" id="btnExplain">Giải thích (LIME)</button>
+    <span class="muted" id="oneHint">Giải thích chạy nhiều lần suy luận nên mất 15–20 giây.</span>
+  </div>
+  <div id="oneOut"></div>
+</section>
+
+<section>
+  <h2>Phân loại một file CSV</h2>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div>
+      <label for="file">Chọn file CSV</label>
+      <input type="text" id="fileLabel" value="chưa chọn file" readonly>
+      <input type="file" id="file" accept=".csv,text/csv" class="hide">
+      <div class="row">
+        <button type="button" class="ghost" id="btnPick">Chọn file…</button>
+        <span class="muted" id="fileInfo"></span>
+      </div>
+    </div>
+    <div>
+      <label for="col">Cột chứa nội dung</label>
+      <select id="col" disabled><option>—</option></select>
+      <label for="truth" style="margin-top:12px">Cột nhãn đúng (tuỳ chọn — để tính accuracy)</label>
+      <select id="truth" disabled><option value="">— không có —</option></select>
+    </div>
+  </div>
+  <div class="row">
+    <button type="button" id="btnRun" disabled>Chạy phân loại</button>
+    <button type="button" class="ghost hide" id="btnStop">Dừng</button>
+    <button type="button" class="ghost hide" id="btnCsv">Tải CSV kết quả</button>
+    <span class="muted" id="progress"></span>
+  </div>
+  <div class="bar hide" id="barWrap"><div id="bar"></div></div>
+  <div id="runWarn"></div>
+</section>
+
+<section id="results" class="hide">
+  <h2>Kết quả</h2>
+  <div class="grid" id="resultStats"></div>
+  <div class="row">
+    <label style="margin:0">Lọc</label>
+    <select id="filter" style="width:auto">
+      <option value="">tất cả</option>
+      <option value="positive">positive</option>
+      <option value="neutral">neutral</option>
+      <option value="negative">negative</option>
+      <option value="wrong">chỉ dự đoán sai</option>
+    </select>
+    <span class="muted" id="shown"></span>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>#</th><th>Nội dung</th><th>Dự đoán</th><th class="n">Confidence</th>
+        <th class="n">Score</th><th id="thTruth" class="hide">Nhãn đúng</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+var MAX_BATCH = parseInt("__MAX_BATCH_SIZE__", 10) || 64;
+var SOFT_ROW_WARNING = 2000;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ var d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
+function pill(label){
+  var cls = label === "positive" ? "p-pos" : label === "negative" ? "p-neg" : "p-neu";
+  return '<span class="pill '+cls+'">'+esc(label)+'</span>';
+}
+function note(target, text, kind){
+  $(target).innerHTML = text ? '<div class="note '+(kind||"")+'" style="margin-top:12px">'+text+'</div>' : "";
+}
+
+/* ---------- CSV ---------------------------------------------------------- */
+
+/* Hand-rolled because the page must stay dependency-free, and the naive
+   split(",") breaks on the first quoted comma — which real feedback text has
+   plenty of. Handles quoted fields, escaped quotes, CRLF and a BOM. */
+function parseCSV(text){
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  var rows=[], row=[], field="", quoted=false, i=0;
+  while (i < text.length){
+    var c = text[i];
+    if (quoted){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
+        quoted = false; i++; continue;
+      }
+      field += c; i++; continue;
+    }
+    if (c === '"'){ quoted = true; i++; continue; }
+    if (c === ","){ row.push(field); field=""; i++; continue; }
+    if (c === "\r"){ i++; continue; }
+    if (c === "\n"){ row.push(field); rows.push(row); row=[]; field=""; i++; continue; }
+    field += c; i++;
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(function(r){ return r.length > 1 || (r[0] && r[0].trim()); });
+}
+
+function toCSV(rows){
+  return rows.map(function(r){
+    return r.map(function(v){
+      v = v == null ? "" : String(v);
+      return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+    }).join(",");
+  }).join("\n");
+}
+
+/* A column of free text looks different from an id or a label: it is long and
+   it is mostly unique. Picking by that beats guessing from the header name,
+   which may be in any language. */
+function guessTextColumn(header, rows){
+  var NAMED = /^(text|content|sentence|comment|review|feedback|noi_?dung|cau|binh_?luan)$/i;
+
+  function score(c){
+    var total = 0, seen = {}, n = 0;
+    for (var r = 0; r < Math.min(rows.length, 200); r++){
+      var v = (rows[r][c] || "").trim();
+      if (!v) continue;
+      total += v.length; seen[v] = 1; n++;
+    }
+    if (!n) return -1;
+    return (total / n) * (0.4 + Object.keys(seen).length / n);
+  }
+
+  /* An explicit header wins outright rather than by a multiplier. A column
+     literally called "text" states the author's intent, and a merely longer
+     "notes" column beside it should not override that — a weighted bonus lost
+     that argument whenever the other column was twice as long. */
+  var pool = [];
+  for (var c = 0; c < header.length; c++) if (NAMED.test((header[c] || "").trim())) pool.push(c);
+  if (!pool.length) for (var j = 0; j < header.length; j++) pool.push(j);
+
+  var best = pool[0], bestScore = -Infinity;
+  pool.forEach(function(c){
+    var s = score(c);
+    if (s > bestScore){ bestScore = s; best = c; }
+  });
+  return best;
+}
+
+/* ---------- API ---------------------------------------------------------- */
+
+async function api(path, body){
+  var res = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
+  });
+  var payload = null;
+  try { payload = await res.json(); } catch (e) { /* /metrics and friends are not JSON */ }
+  return { ok: res.ok, status: res.status, body: payload };
+}
+
+async function loadModel(){
+  $("modelStats").innerHTML = '<div class="muted">đang tải…</div>';
+  var r = await api("/api/v1/model/info");
+  if (!r.ok){
+    $("modelStats").innerHTML = "";
+    note("modelWarn", "Không đọc được <code>/api/v1/model/info</code> (HTTP "+r.status+"). Service đã sẵn sàng chưa?", "bad");
+    return;
+  }
+  var m = r.body, met = m.metrics || {};
+  var cells = [
+    ["model", m.model_version], ["lớp predictor", m.predictor_class], ["stage", m.stage],
+    ["accuracy", met.test_accuracy != null ? met.test_accuracy.toFixed(4) : "—"],
+    ["macro-F1", met.test_macro_f1 != null ? met.test_macro_f1.toFixed(4) : "—"],
+    ["fairness gap", m.fairness_delta != null ? m.fairness_delta.toFixed(4) : "chưa đo"]
+  ];
+  $("modelStats").innerHTML = cells.map(function(c){
+    return '<div class="stat"><b>'+esc(c[1])+'</b><span>'+esc(c[0])+'</span></div>';
+  }).join("");
+  note("modelWarn", m.fairness_delta == null
+    ? "Model này <b>chưa đo fairness gap</b> — alert <code>FairnessUnmeasured</code> đang kêu đúng theo thiết kế."
+    : "", "warn");
+}
+
+/* ---------- một câu ------------------------------------------------------- */
+
+async function classifyOne(){
+  var text = $("one").value;
+  $("btnOne").disabled = true;
+  var r = await api("/api/v1/predict", {text: text});
+  $("btnOne").disabled = false;
+  if (!r.ok){
+    note("oneOut", "HTTP "+r.status+" · <code>"+esc(r.body && r.body.error_code)+"</code> — "+esc(r.body && r.body.message), "bad");
+    return;
+  }
+  var p = r.body;
+  $("oneOut").innerHTML =
+    '<div class="grid" style="margin-top:14px">' +
+      '<div class="stat"><b>'+pill(p.label)+'</b><span>nhãn</span></div>' +
+      '<div class="stat"><b>'+p.confidence.toFixed(4)+'</b><span>confidence</span></div>' +
+      '<div class="stat"><b>'+p.score.toFixed(4)+'</b><span>score (lớp positive)</span></div>' +
+      '<div class="stat"><b>'+p.latency_ms.toFixed(0)+' ms</b><span>latency</span></div>' +
+      (p.truncated ? '<div class="stat"><b>có</b><span>bị cắt bớt</span></div>' : '') +
+    '</div>';
+}
+
+async function explainOne(){
+  var btn = $("btnExplain");
+  btn.disabled = true; btn.textContent = "đang giải thích…";
+  var started = Date.now();
+  var r = await api("/api/v1/explain", {text: $("one").value});
+  btn.disabled = false; btn.textContent = "Giải thích (LIME)";
+  if (!r.ok){
+    var msg = r.status === 429
+      ? "Đang có một giải thích khác chạy — API chỉ nhận <b>một</b> lần mỗi lúc, và từ chối ngay thay vì xếp hàng."
+      : "HTTP "+r.status+" · <code>"+esc(r.body && r.body.error_code)+"</code>";
+    note("oneOut", msg, "bad");
+    return;
+  }
+  var d = r.body;
+  var items = d.attributions.slice().sort(function(a,b){ return Math.abs(b.attribution)-Math.abs(a.attribution); });
+  var max = Math.max.apply(null, items.map(function(a){ return Math.abs(a.attribution); })) || 1;
+  $("oneOut").innerHTML =
+    '<div style="margin-top:14px">' + pill(d.label) +
+    ' <span class="muted">score '+d.score.toFixed(4)+' · '+((Date.now()-started)/1000).toFixed(1)+'s</span></div>' +
+    '<table><thead><tr><th>Token</th><th class="n">Đóng góp</th><th>Hướng</th></tr></thead><tbody>' +
+    items.map(function(a){
+      var w = Math.round(Math.abs(a.attribution)/max*100);
+      var colour = a.attribution >= 0 ? "var(--go)" : "var(--stop)";
+      return '<tr><td><code>'+esc(a.token)+'</code></td><td class="n">'+a.attribution.toFixed(4)+'</td>' +
+             '<td><div style="height:8px;width:'+w+'%;background:'+colour+';border-radius:2px"></div></td></tr>';
+    }).join("") + '</tbody></table>' +
+    '<div class="muted" style="margin-top:8px">Xanh đẩy về <code>positive</code>, đỏ kéo ngược lại. ' +
+    'LIME giải thích xác suất lớp positive, không phải cả ba lớp.</div>';
+}
+
+/* ---------- CSV ---------------------------------------------------------- */
+
+var parsed = null;      // {header, rows}
+var results = null;     // [{i, text, label, score, confidence, truth}]
+var cancelled = false;
+
+function onFile(file){
+  $("fileLabel").value = file.name;
+  var reader = new FileReader();
+  reader.onload = function(){
+    var rows = parseCSV(String(reader.result));
+    if (rows.length < 2){
+      note("runWarn", "File không có dòng dữ liệu nào đọc được.", "bad");
+      return;
+    }
+    var header = rows[0], body = rows.slice(1);
+    parsed = {header: header, rows: body};
+    var opts = header.map(function(h,i){ return '<option value="'+i+'">'+esc(h||("cột "+(i+1)))+'</option>'; }).join("");
+    $("col").innerHTML = opts; $("col").disabled = false;
+    $("truth").innerHTML = '<option value="">— không có —</option>' + opts; $("truth").disabled = false;
+    $("col").value = String(guessTextColumn(header, body));
+    var truthIdx = header.findIndex(function(h){ return /^(actual|label|truth|nhan|sentiment)$/i.test((h||"").trim()); });
+    $("truth").value = truthIdx >= 0 ? String(truthIdx) : "";
+    $("fileInfo").textContent = body.length.toLocaleString("vi-VN") + " dòng · " + header.length + " cột";
+    $("btnRun").disabled = false;
+    note("runWarn", body.length > SOFT_ROW_WARNING
+      ? "File có <b>"+body.length.toLocaleString("vi-VN")+" dòng</b>. Với ~75 ms mỗi câu, dự kiến khoảng <b>"
+        + Math.ceil(body.length*0.075/60) + " phút</b>. Có thể bấm Dừng bất cứ lúc nào."
+      : "", "warn");
+  };
+  reader.readAsText(file, "utf-8");
+}
+
+async function runBatch(){
+  if (!parsed) return;
+  var col = parseInt($("col").value, 10);
+  var truthCol = $("truth").value === "" ? -1 : parseInt($("truth").value, 10);
+  var items = [];
+  parsed.rows.forEach(function(r, i){
+    var t = (r[col] || "").trim();
+    if (t) items.push({i: i + 2, text: t, truth: truthCol >= 0 ? (r[truthCol]||"").trim().toLowerCase() : null});
+  });
+  if (!items.length){ note("runWarn", "Cột đã chọn không có nội dung nào.", "bad"); return; }
+
+  cancelled = false; results = [];
+  $("btnRun").disabled = true; $("btnStop").classList.remove("hide");
+  $("btnCsv").classList.add("hide"); $("barWrap").classList.remove("hide");
+  var done = 0, started = Date.now(), shed = 0;
+
+  for (var start = 0; start < items.length && !cancelled; start += MAX_BATCH){
+    var chunk = items.slice(start, start + MAX_BATCH);
+    var r = await api("/api/v1/predict/batch", {texts: chunk.map(function(c){ return c.text; })});
+
+    // 429 is admission control doing its job, not a failure: wait and retry the
+    // same chunk rather than dropping rows on the floor.
+    var attempts = 0;
+    while (r.status === 429 && attempts < 8 && !cancelled){
+      shed++; attempts++;
+      await new Promise(function(res){ setTimeout(res, 400 * attempts); });
+      r = await api("/api/v1/predict/batch", {texts: chunk.map(function(c){ return c.text; })});
+    }
+    if (!r.ok){
+      note("runWarn", "Dừng ở dòng "+chunk[0].i+" — HTTP "+r.status+" <code>"+esc(r.body && r.body.error_code)+"</code>", "bad");
+      break;
+    }
+    r.body.results.forEach(function(item, k){
+      var src = chunk[k];
+      if (item.prediction){
+        results.push({i: src.i, text: src.text, truth: src.truth,
+                      label: item.prediction.label, score: item.prediction.score,
+                      confidence: item.prediction.confidence});
+      } else {
+        results.push({i: src.i, text: src.text, truth: src.truth, label: null, error: item.error});
+      }
+    });
+    done += chunk.length;
+    $("bar").style.width = (done / items.length * 100) + "%";
+    var rate = done / ((Date.now() - started) / 1000);
+    $("progress").textContent = done + "/" + items.length + " · " + rate.toFixed(1) + " câu/s"
+      + (shed ? " · " + shed + " lần bị 429 và thử lại" : "");
+  }
+
+  $("btnRun").disabled = false; $("btnStop").classList.add("hide");
+  if (results.length) { $("btnCsv").classList.remove("hide"); render(); }
+  if (cancelled) $("progress").textContent += " — đã dừng";
+}
+
+function render(){
+  var filter = $("filter").value;
+  var hasTruth = results.some(function(r){ return r.truth; });
+  $("thTruth").classList.toggle("hide", !hasTruth);
+
+  var ok = results.filter(function(r){ return r.label; });
+  var counts = {positive:0, neutral:0, negative:0};
+  var correct = 0, comparable = 0;
+  ok.forEach(function(r){
+    counts[r.label] = (counts[r.label] || 0) + 1;
+    if (r.truth){ comparable++; if (r.truth === r.label) correct++; }
+  });
+  var stats = [
+    ["đã phân loại", ok.length.toLocaleString("vi-VN")],
+    ["positive", counts.positive], ["neutral", counts.neutral], ["negative", counts.negative]
+  ];
+  if (comparable) stats.push(["accuracy", (correct/comparable*100).toFixed(1) + "%"]);
+  var failed = results.length - ok.length;
+  if (failed) stats.push(["lỗi từng dòng", failed]);
+  $("resultStats").innerHTML = stats.map(function(s){
+    return '<div class="stat"><b>'+esc(s[1])+'</b><span>'+esc(s[0])+'</span></div>';
+  }).join("");
+
+  var view = results.filter(function(r){
+    if (!filter) return true;
+    if (filter === "wrong") return r.truth && r.label && r.truth !== r.label;
+    return r.label === filter;
+  });
+  $("shown").textContent = "hiển thị " + view.length.toLocaleString("vi-VN") + " dòng"
+    + (view.length > 500 ? " (cắt còn 500 dòng đầu)" : "");
+  $("rows").innerHTML = view.slice(0, 500).map(function(r){
+    return '<tr><td class="n">'+r.i+'</td><td>'+esc(r.text.slice(0,160))+'</td>' +
+      '<td>'+(r.label ? pill(r.label) : '<span class="muted">'+esc(r.error)+'</span>')+'</td>' +
+      '<td class="n">'+(r.confidence != null ? r.confidence.toFixed(4) : "—")+'</td>' +
+      '<td class="n">'+(r.score != null ? r.score.toFixed(4) : "—")+'</td>' +
+      (hasTruth ? '<td>'+(r.truth ? pill(r.truth) : "—")+'</td>' : '') + '</tr>';
+  }).join("");
+  $("results").classList.remove("hide");
+}
+
+function downloadCSV(){
+  var head = ["row", "text", "label", "score", "confidence"];
+  var hasTruth = results.some(function(r){ return r.truth; });
+  if (hasTruth) head.push("actual", "correct");
+  var rows = [head].concat(results.map(function(r){
+    var out = [r.i, r.text, r.label || "", r.score != null ? r.score : "", r.confidence != null ? r.confidence : ""];
+    if (hasTruth) out.push(r.truth || "", r.truth && r.label ? String(r.truth === r.label) : "");
+    return out;
+  }));
+  var blob = new Blob(["﻿" + toCSV(rows)], {type: "text/csv;charset=utf-8"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "sentiment-results.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- wiring -------------------------------------------------------- */
+
+$("refresh").onclick = loadModel;
+$("btnOne").onclick = classifyOne;
+$("btnExplain").onclick = explainOne;
+$("btnPick").onclick = function(){ $("file").click(); };
+$("file").onchange = function(e){ if (e.target.files[0]) onFile(e.target.files[0]); };
+$("btnRun").onclick = runBatch;
+$("btnStop").onclick = function(){ cancelled = true; };
+$("btnCsv").onclick = downloadCSV;
+$("filter").onchange = function(){ if (results) render(); };
+
+loadModel();
+</script>
+</body>
+</html>

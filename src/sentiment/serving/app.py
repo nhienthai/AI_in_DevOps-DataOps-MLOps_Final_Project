@@ -5,6 +5,7 @@ import logging
 import secrets
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request, Response
@@ -49,6 +50,8 @@ from sentiment.serving.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+UI_PAGE = Path(__file__).with_name("ui.html")
 
 _BOOTSTRAP_REFERENCE = DriftReference(
     length_bin_edges=(0.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 100_000.0),
@@ -272,6 +275,19 @@ def create_app(
     @app.get("/metrics", tags=["operations"], include_in_schema=True)
     async def metrics() -> Response:
         return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+    if settings.enable_ui:
+        # include_in_schema=False on purpose: /ui is a console for people, and
+        # listing it as an operation would imply a machine contract this page
+        # does not have. The batch limit is substituted in so the page chunks a
+        # CSV to whatever this deployment actually accepts rather than to 64
+        # hard-coded in JavaScript.
+        @app.get("/ui", include_in_schema=False)
+        async def console() -> Response:
+            page = UI_PAGE.read_text(encoding="utf-8").replace(
+                "__MAX_BATCH_SIZE__", str(settings.max_batch_size)
+            )
+            return Response(content=page, media_type="text/html; charset=utf-8")
 
     router = APIRouter(prefix="/api/v1", tags=["inference"])
 

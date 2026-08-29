@@ -11,6 +11,12 @@ requires-python = ">=3.10"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The console at /ui is an HTML file next to the module that serves it.
+# setuptools ships only .py by default, so without this the page works from a
+# source checkout and 404s inside the image — the worst kind of difference.
+[tool.setuptools.package-data]
+"sentiment.serving" = ["*.html"]
+
 [tool.black]
 line-length = 100
 target-version = ["py310"]

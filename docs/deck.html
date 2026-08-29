@@ -73,7 +73,7 @@
   .l-fig-notes{display:grid;grid-template-columns:1fr .58fr;gap:var(--gut);align-items:center}
   .l-triad{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gut);align-items:start}
   .l-quad{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-  @media(max-width:960px){.l-split,.l-main-aside,.l-aside-main,.l-fig-notes,.l-triad{grid-template-columns:1fr;gap:16px}
+  @media(max-width:820px){.l-split,.l-main-aside,.l-aside-main,.l-fig-notes,.l-triad{grid-template-columns:1fr;gap:16px}
                           .l-quad{grid-template-columns:repeat(2,1fr)}}
 
   .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
@@ -205,12 +205,80 @@
 <main class="stage" id="stage">
 
 <!-- 01 ══════════════════════════════════════════ -->
-<section class="slide on" data-sp="Nhiên" data-act="Frame" data-min="0.75" data-t="Title &amp; the problem">
+<section class="slide on" data-sp="Nhiên" data-act="Intro" data-min="1" data-t="The brief">
   <div class="wrap">
-    <div class="eyebrow">DDM501 · AI in Production · Topic 8 · Sentiment Analysis Service</div>
+    <div class="eyebrow">DDM501 · AI in Production: From Models to Systems · Final project</div>
     <div class="l-main-aside">
       <div style="display:grid;gap:16px">
         <h1>Six services,<br>two gates.</h1>
+        <p class="lead">Topic 8 — a Vietnamese sentiment analysis service, built and operated as a
+        production system rather than handed over as a notebook.</p>
+        <div class="callout"><p class="kicker">Train a model, <b>and</b> run it.</p></div>
+      </div>
+      <div style="display:grid;gap:12px">
+        <dl class="spec">
+          <dt>topic</dt><dd><b>8</b> — Sentiment Analysis Service</dd>
+          <dt>task</dt><dd>Vietnamese course feedback → <code>negative</code> · <code>neutral</code> · <code>positive</code></dd>
+          <dt>dataset</dt><dd><code>tridm/UIT-VSFC</code> — 11,426 train · 1,583 validation · 3,166 test</dd>
+          <dt>deliverable</dt><dd>A running service: HTTP contract, model registry, monitoring, CI/CD</dd>
+          <dt>team</dt><dd><b>5</b> members · <b>2</b> weeks · disjoint ownership</dd>
+        </dl>
+        <div class="card">
+          <h3>what the brief asks that a notebook cannot answer</h3>
+          <p>Who promoted this model, and on what evidence? What happens when it degrades?
+          Can a person challenge a single prediction? <strong>Every one of those is an
+          operations question, not a modelling one.</strong></p>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><b>0:55.</b> Open here. Name the topic and the one framing that carries the
+    whole deck: the deliverable is a service, so the interesting work is what stops a bad model
+    from reaching a user. Do not mention metrics yet.</div>
+  </div>
+</section>
+
+<section class="slide" data-sp="Nhiên" data-act="Intro" data-min="0.75" data-t="Team and ownership">
+  <div class="wrap">
+    <div class="eyebrow">Team · <em>who owns what</em></div>
+    <h2>Five areas, no shared directories</h2>
+    <div class="l-main-aside">
+      <div class="tw"><table>
+        <thead><tr><th>Member</th><th>Area</th><th>Owns in the repository</th></tr></thead>
+        <tbody>
+          <tr><td class="k">M1 · Lý Minh Thông</td><td>Data &amp; Features</td><td class="sm"><code>src/sentiment/data/</code> · <code>tests/data/</code> — ingestion, the quality gate, drift reference</td></tr>
+          <tr><td class="k">M2 · Dương Thành Duy</td><td>Training &amp; Experiments</td><td class="sm"><code>models/</code> · <code>training/</code> · <code>scripts/train_model.py</code> · <code>validate_model.py</code> · <code>notebooks/</code></td></tr>
+          <tr><td class="k">M3 · Bùi Vân Sơn</td><td>Serving &amp; Containers</td><td class="sm"><code>src/sentiment/serving/</code> · <code>Dockerfile</code> · <code>docker-compose.yml</code></td></tr>
+          <tr><td class="k">M4 · Lê Công Huỳnh</td><td>Monitoring &amp; CI/CD</td><td class="sm"><code>prometheus/</code> · <code>grafana/</code> · <code>alertmanager/</code> · <code>.github/workflows/</code> · <code>tests/integration/</code></td></tr>
+          <tr><td class="k">M5 · Thái Bình Nhiên</td><td>Responsible AI &amp; Docs</td><td class="sm"><code>src/sentiment/responsible/</code> · <code>run_fairness_probe.py</code> · <code>docs/</code></td></tr>
+        </tbody>
+      </table></div>
+      <div style="display:grid;gap:12px">
+        <div class="card card--go">
+          <h3>ownership is disjoint on purpose</h3>
+          <p>No two people own the same directory. Merge conflicts stay rare, and
+          <strong>the git history becomes the evidence of who did what</strong> — every commit
+          maps to a person by email, so nobody has to argue for their contribution.</p>
+        </div>
+        <div class="card">
+          <h3>the seams are contracts</h3>
+          <p>Areas meet at interfaces, not at files: the <code>Predictor</code> protocol, the HTTP
+          schema, the metric names. That is why a real model could replace the stub in week 2
+          <strong>without touching four of the five areas</strong>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><b>0:40.</b> Ten seconds per person, no more — say the area and one thing they
+    own. The point of the slide is the two cards: ownership is verifiable, and the seams are
+    contracts. That is what made parallel work possible on a two-week deadline.</div>
+  </div>
+</section>
+
+<section class="slide" data-sp="Nhiên" data-act="Intro" data-min="0.75" data-t="The problem">
+  <div class="wrap">
+    <div class="eyebrow">01 · Intro · <em>the problem</em></div>
+    <div class="l-main-aside">
+      <div style="display:grid;gap:16px">
+        <h2>Nobody reads thirty thousand comments</h2>
         <p class="lead">Vietnamese student course feedback, classified as a production system — where nothing reaches a user without passing a check that can stop the build.</p>
         <div class="stats">
           <div class="stat"><span class="stat__v">30k</span><span class="stat__l">comments / semester</span></div>
@@ -219,13 +287,6 @@
         </div>
       </div>
       <div style="display:grid;gap:12px">
-        <div class="tw"><table><tbody>
-          <tr><td class="k">Lý Minh Thông</td><td class="n">M1</td><td class="sm">Data &amp; Features</td></tr>
-          <tr><td class="k">Dương Thành Duy</td><td class="n">M2</td><td class="sm">Training &amp; Experiments</td></tr>
-          <tr><td class="k">Bùi Vân Sơn</td><td class="n">M3</td><td class="sm">Serving &amp; Containers</td></tr>
-          <tr><td class="k">Lê Công Huỳnh</td><td class="n">M4</td><td class="sm">Monitoring &amp; CI/CD</td></tr>
-          <tr><td class="k">Thái Bình Nhiên</td><td class="n">M5</td><td class="sm">Responsible AI &amp; Docs</td></tr>
-        </tbody></table></div>
         <div class="card card--stop">
           <h3>the actual cost</h3>
           <p>Keyword counting cannot separate <code>thầy dạy hay</code> from <code>thầy dạy <b>không</b> hay</code>. So a department finds a failing course <strong>a semester late</strong>.</p>
@@ -236,33 +297,9 @@
   </div>
 </section>
 
-<!-- 02 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Nhiên" data-act="Frame" data-min="0.5" data-t="How this is structured">
+<section class="slide" data-sp="Thông" data-act="Intro" data-min="1" data-t="The 4% constraint">
   <div class="wrap">
-    <div class="eyebrow">Roadmap · <em>18 minutes</em></div>
-    <h2>Where the time goes, and why</h2>
-    <div class="l-main-aside">
-      <div class="agenda">
-        <div class="ag"><span class="ag__n">I</span><span class="ag__t">Frame <s>— the problem and the one constraint that shapes everything</s></span><span class="ag__w"></span><span class="ag__m">2:15</span></div>
-        <div class="ag ag--hero"><span class="ag__n">II</span><span class="ag__t">Deep dive <s>— architecture, gates, serving, monitoring, CI</s></span><span class="ag__w">40% of the mark</span><span class="ag__m">9:45</span></div>
-        <div class="ag"><span class="ag__n">III</span><span class="ag__t">Responsible AI <s>— fairness measured, mitigated, gated</s></span><span class="ag__w">15%</span><span class="ag__m">2:45</span></div>
-        <div class="ag"><span class="ag__n">IV</span><span class="ag__t">Live demo <s>— seven commands against a running stack</s></span><span class="ag__w">15%</span><span class="ag__m">1:45</span></div>
-        <div class="ag"><span class="ag__n">V</span><span class="ag__t">What we got wrong, and close</span><span class="ag__w"></span><span class="ag__m">1:30</span></div>
-      </div>
-      <div class="card">
-        <h3>the through-line</h3>
-        <p>Every section answers the same question in its own domain: <strong>what stops a bad thing from reaching production, and how do we know it works?</strong></p>
-        <p style="margin-top:6px">Twice in this deck the answer is “a gate caught it and code review did not”.</p>
-      </div>
-    </div>
-    <div class="notes"><b>0:25.</b> Say the weights out loud. It signals you read the rubric and tells the panel where to spend their attention.</div>
-  </div>
-</section>
-
-<!-- 03 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Thông" data-act="Frame" data-min="1" data-t="The 4% constraint">
-  <div class="wrap">
-    <div class="eyebrow">01 · The constraint · <em>UIT-VSFC</em></div>
+    <div class="eyebrow">02 · The constraint · <em>UIT-VSFC</em></div>
     <h2>One class is 4% of the corpus</h2>
     <div class="l-fig-notes">
       <figure>
@@ -303,43 +340,7 @@
   </div>
 </section>
 
-<!-- 04 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="0.5" data-t="System at a glance">
-  <div class="wrap">
-    <div class="eyebrow">02 · Deep dive · <em>specification</em></div>
-    <h2>The system, in numbers</h2>
-    <div class="l-split">
-      <dl class="spec">
-        <dt>services</dt><dd><b>6</b> — api · postgres · mlflow · prometheus · alertmanager · grafana, every one with a health check</dd>
-        <dt>api</dt><dd>FastAPI + uvicorn, versioned at <code>/api/v1</code>, OpenAPI 3.1 with examples on <b>12/12</b> schemas</dd>
-        <dt>model</dt><dd>PhoBERT-v2 fine-tuned on UIT-VSFC, served from disk, registry version <b>5</b>, stage <b>Production</b></dd>
-        <dt>limits</dt><dd>batch <b>64</b> · text <b>5,000</b> chars · body <b>1 MB</b> · <b>2</b> concurrent inferences · <b>1</b> concurrent explanation</dd>
-        <dt>budgets</dt><dd>queue <b>1s</b> · inference <b>30s</b> · explanation <b>60s</b> · p95 target <b>200 ms</b>, measured <b>98 ms</b> over 150 requests</dd>
-        <dt>image</dt><dd>multi-stage, non-root UID 1000, base pinned by digest, no <code>pip</code> in the runtime layer</dd>
-      </dl>
-      <div style="display:grid;gap:12px">
-        <div class="l-quad">
-          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">20</span><span class="stat__l">metrics</span></div>
-          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">10</span><span class="stat__l">alerts</span></div>
-          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">3</span><span class="stat__l">dashboards</span></div>
-          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">202</span><span class="stat__l">tests</span></div>
-        </div>
-        <div class="card card--go">
-          <h3>the boundary that paid off</h3>
-          <p>All six services were integrated in <strong>week 1 against a stub model</strong>. Swapping in a real model later touched the predictor factory and nothing else — the HTTP contract, the metrics and the tests did not move.</p>
-        </div>
-        <div class="card">
-          <h3>what is not built</h3>
-          <p>Registry-served weights. The transformers are <strong>mounted from disk</strong>, not downloaded from MLflow — the registry holds their lineage and a pointer, not 500 MB of tensors. And the deployed model ships <strong>no drift reference</strong>, so <code>DriftDetected</code> currently fires on a placeholder baseline.</p>
-        </div>
-      </div>
-    </div>
-    <div class="notes"><b>0:30.</b> A reference slide — do not read it. Point at the two cards. Panels like knowing the numbers exist and are stated without being asked.</div>
-  </div>
-</section>
-
-<!-- 05 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="1.25" data-t="Architecture end to end">
+<section class="slide" data-sp="Sơn" data-act="Architecture" data-min="1" data-t="Architecture end to end">
   <div class="wrap">
     <div class="eyebrow">03 · Deep dive · <em>architecture</em></div>
     <h2>Where a model comes from, and where it goes</h2>
@@ -455,10 +456,155 @@
   </div>
 </section>
 
-<!-- 06 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Thông" data-act="Deep dive" data-min="1" data-t="Gate one: the data">
+<section class="slide" data-sp="Duy" data-act="Architecture" data-min="1" data-t="The MLOps pipeline">
   <div class="wrap">
-    <div class="eyebrow">04 · Deep dive · <em>gate one</em></div>
+    <div class="eyebrow">04 · Architecture · <em>lifecycle</em></div>
+    <h2>One loop, two places it can be stopped</h2>
+    <figure>
+      <svg viewBox="0 0 1240 300" role="img" aria-label="MLOps lifecycle: data ingestion passes a validation gate into training and evaluation, then a promotion gate into the MLflow registry; CI builds and deploys the image, serving answers requests, monitoring watches drift and fairness, and drift alerts feed back into retraining.">
+        <defs>
+          <marker id="PA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-mid)"/></marker>
+          <marker id="PS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--stop)"/></marker>
+        </defs>
+        <g font-family="ui-monospace,monospace" font-size="11">
+          <text x="0" y="12" fill="var(--ink-mid)">BUILD — anything here can refuse to continue</text>
+
+          <rect x="0" y="24" width="168" height="54" rx="3" fill="var(--paper-2)" stroke="var(--hair)"/>
+          <text x="12" y="44" fill="var(--ink)" font-weight="600">1 · data</text>
+          <text x="12" y="61" fill="var(--ink-2)" font-size="10">UIT-VSFC → data/ingest</text>
+
+          <rect x="196" y="24" width="132" height="54" rx="3" fill="var(--stop-bg)" stroke="var(--stop)"/>
+          <text x="208" y="44" fill="var(--stop)" font-weight="600">GATE 1</text>
+          <text x="208" y="61" fill="var(--stop)" font-size="10">validate() — rows,</text>
+          <text x="208" y="73" fill="var(--stop)" font-size="10">classes, duplicates</text>
+
+          <rect x="356" y="24" width="168" height="54" rx="3" fill="var(--paper-2)" stroke="var(--hair)"/>
+          <text x="368" y="44" fill="var(--ink)" font-weight="600">2 · train</text>
+          <text x="368" y="61" fill="var(--ink-2)" font-size="10">train_model.py · Kaggle GPU</text>
+
+          <rect x="552" y="24" width="168" height="54" rx="3" fill="var(--paper-2)" stroke="var(--hair)"/>
+          <text x="564" y="44" fill="var(--ink)" font-weight="600">3 · evaluate</text>
+          <text x="564" y="61" fill="var(--ink-2)" font-size="10">Optuna · fairness probe</text>
+
+          <rect x="748" y="24" width="132" height="54" rx="3" fill="var(--stop-bg)" stroke="var(--stop)"/>
+          <text x="760" y="44" fill="var(--stop)" font-weight="600">GATE 2</text>
+          <text x="760" y="61" fill="var(--stop)" font-size="10">validate_model.py</text>
+          <text x="760" y="73" fill="var(--stop)" font-size="10">F1·acc·p95·fairness</text>
+
+          <rect x="908" y="24" width="168" height="54" rx="3" fill="var(--accent-bg)" stroke="var(--accent)"/>
+          <text x="920" y="44" fill="var(--accent)" font-weight="600">4 · registry</text>
+          <text x="920" y="61" fill="var(--accent)" font-size="10">MLflow · stage Production</text>
+
+          <line x1="168" y1="51" x2="192" y2="51" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+          <line x1="328" y1="51" x2="352" y2="51" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+          <line x1="524" y1="51" x2="548" y2="51" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+          <line x1="720" y1="51" x2="744" y2="51" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+          <line x1="880" y1="51" x2="904" y2="51" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+
+          <text x="196" y="100" fill="var(--stop)" font-size="10">↓ fails the run</text>
+          <text x="748" y="100" fill="var(--stop)" font-size="10">↓ refuses to promote</text>
+
+          <text x="0" y="150" fill="var(--ink-mid)">RUN — every change here is a config change, not a rebuild</text>
+
+          <rect x="0" y="162" width="168" height="54" rx="3" fill="var(--paper-2)" stroke="var(--hair)"/>
+          <text x="12" y="182" fill="var(--ink)" font-weight="600">5 · CI/CD</text>
+          <text x="12" y="199" fill="var(--ink-2)" font-size="10">lint→type→test→scan→push</text>
+
+          <rect x="196" y="162" width="168" height="54" rx="3" fill="var(--paper-2)" stroke="var(--hair)"/>
+          <text x="208" y="182" fill="var(--ink)" font-weight="600">6 · deploy</text>
+          <text x="208" y="199" fill="var(--ink-2)" font-size="10">compose · 6 services</text>
+
+          <rect x="392" y="162" width="168" height="54" rx="3" fill="var(--go-bg)" stroke="var(--go)"/>
+          <text x="404" y="182" fill="var(--go)" font-weight="600">7 · serve</text>
+          <text x="404" y="199" fill="var(--go)" font-size="10">/predict · shed · reload</text>
+
+          <rect x="588" y="162" width="168" height="54" rx="3" fill="var(--paper-2)" stroke="var(--hair)"/>
+          <text x="600" y="182" fill="var(--ink)" font-weight="600">8 · monitor</text>
+          <text x="600" y="199" fill="var(--ink-2)" font-size="10">20 metrics · 10 alerts</text>
+
+          <line x1="168" y1="189" x2="192" y2="189" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+          <line x1="364" y1="189" x2="388" y2="189" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+          <line x1="560" y1="189" x2="584" y2="189" stroke="var(--ink-mid)" marker-end="url(#PA)"/>
+
+          <path d="M756 189 H820 V262 H84 V222" fill="none" stroke="var(--stop)" stroke-dasharray="4 3" marker-end="url(#PS)"/>
+          <text x="300" y="277" fill="var(--stop)" font-size="10">DriftDetected · PredictionSkew · FairnessRegression → retrain</text>
+
+          <path d="M992 78 V120 H84 V158" fill="none" stroke="var(--accent)" stroke-dasharray="4 3" marker-end="url(#PA)"/>
+          <text x="640" y="134" fill="var(--accent)" font-size="10">a promoted version is what CI ships</text>
+        </g>
+      </svg>
+      <figcaption>The two red boxes are the only places a bad model is stopped. Everything else moves it along.</figcaption>
+    </figure>
+    <div class="l-triad">
+      <div class="card"><h3>what is automated</h3><p>Stages <b>1</b>, <b>3</b>, <b>5</b>–<b>8</b> run without a person: the data gate on every training run, CI on every push, monitoring continuously.</p></div>
+      <div class="card card--warn"><h3>what is still manual</h3><p>The transformer was fine-tuned on a <strong>Kaggle GPU</strong> and imported. Stage <b>2</b> is not in CI, and we do not pretend otherwise — no runner here has a GPU.</p></div>
+      <div class="card card--go"><h3>why the loop closes</h3><p>Stage <b>8</b> feeds stage <b>2</b>: drift and skew alerts are the trigger to retrain, which is what makes this a lifecycle rather than a one-way delivery.</p></div>
+    </div>
+    <div class="notes"><b>0:55.</b> The one slide that shows the whole project at once. Trace it with a finger: left to right on the top row, then the bottom row, then the red arrow back. Land two sentences — the red boxes are the only brakes, and stage 2 is honestly still manual.</div>
+  </div>
+</section>
+
+<section class="slide" data-sp="Sơn" data-act="Architecture" data-min="0.5" data-t="System at a glance">
+  <div class="wrap">
+    <div class="eyebrow">05 · Deep dive · <em>specification</em></div>
+    <h2>The system, in numbers</h2>
+    <div class="l-split">
+      <dl class="spec">
+        <dt>services</dt><dd><b>6</b> — api · postgres · mlflow · prometheus · alertmanager · grafana, every one with a health check</dd>
+        <dt>api</dt><dd>FastAPI + uvicorn, versioned at <code>/api/v1</code>, OpenAPI 3.1 with examples on <b>12/12</b> schemas</dd>
+        <dt>model</dt><dd>PhoBERT-v2 fine-tuned on UIT-VSFC, served from disk, registry version <b>5</b>, stage <b>Production</b></dd>
+        <dt>limits</dt><dd>batch <b>64</b> · text <b>5,000</b> chars · body <b>1 MB</b> · <b>2</b> concurrent inferences · <b>1</b> concurrent explanation</dd>
+        <dt>budgets</dt><dd>queue <b>1s</b> · inference <b>30s</b> · explanation <b>60s</b> · p95 target <b>200 ms</b>, measured <b>98 ms</b> over 150 requests</dd>
+        <dt>image</dt><dd>multi-stage, non-root UID 1000, base pinned by digest, no <code>pip</code> in the runtime layer</dd>
+      </dl>
+      <div style="display:grid;gap:12px">
+        <div class="l-quad">
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">20</span><span class="stat__l">metrics</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">10</span><span class="stat__l">alerts</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">3</span><span class="stat__l">dashboards</span></div>
+          <div class="stat" style="border:1px solid var(--hair)"><span class="stat__v">202</span><span class="stat__l">tests</span></div>
+        </div>
+        <div class="card card--go">
+          <h3>the boundary that paid off</h3>
+          <p>All six services were integrated in <strong>week 1 against a stub model</strong>. Swapping in a real model later touched the predictor factory and nothing else — the HTTP contract, the metrics and the tests did not move.</p>
+        </div>
+        <div class="card">
+          <h3>what is not built</h3>
+          <p>Registry-served weights. The transformers are <strong>mounted from disk</strong>, not downloaded from MLflow — the registry holds their lineage and a pointer, not 500 MB of tensors. And the deployed model ships <strong>no drift reference</strong>, so <code>DriftDetected</code> currently fires on a placeholder baseline.</p>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><b>0:30.</b> A reference slide — do not read it. Point at the two cards. Panels like knowing the numbers exist and are stated without being asked.</div>
+  </div>
+</section>
+
+<section class="slide" data-sp="Sơn" data-act="Architecture" data-min="0.5" data-t="Technology trade-offs">
+  <div class="wrap">
+    <div class="eyebrow">06 · Deep dive · <em>decisions</em></div>
+    <h2>What we chose, and what we gave up</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Decision</th><th>Chosen</th><th>Rejected</th><th>What it cost us</th></tr></thead>
+        <tbody>
+          <tr class="pick"><td class="k">Model</td><td class="k">PhoBERT-v2</td><td>XLM-RoBERTa · DistilBERT · TF-IDF</td><td>DistilBERT is English-only. We fine-tuned XLM-R first and PhoBERT second, then measured both on the same split: <strong>0.8457 vs 0.8337 macro-F1</strong>, and PhoBERT is half the size. The multilingual claim is what we gave up. The 200 ms budget survived: p95 <strong>98 ms</strong> on two CPUs.</td></tr>
+          <tr><td class="k">Drift measure</td><td class="k">PSI on input length</td><td>KS test · KL · Evidently</td><td>PSI has a conventional reading (&lt;0.1 / 0.1–0.2 / &gt;0.2), so the threshold is arguable rather than invented. It is coarser than KS.</td></tr>
+          <tr><td class="k">Fairness method</td><td class="k">Identity-pair probe (EEC)</td><td>Group-wise metrics · Fairlearn</td><td>The corpus has no demographic columns, so group metrics are impossible. The probe measures the model, not the population — a real limitation.</td></tr>
+          <tr><td class="k">Metrics</td><td class="k">In-process <code>prometheus_client</code></td><td>Sidecar exporter · StatsD</td><td>Drift and confidence are functions of the prediction, so a sidecar would mean shipping predictions to a second process. Cost: the API owns its own instrumentation.</td></tr>
+          <tr><td class="k">Lint chain</td><td class="k">flake8 + black + isort, pinned</td><td>ruff</td><td>ruff replaces all three and is far faster. We took consistency with the graded labs over speed, and pinned versions so a release cannot redden the build.</td></tr>
+          <tr><td class="k">Orchestration</td><td class="k">Docker Compose</td><td>Kubernetes</td><td>Required by the brief and right for one laptop. No horizontal scaling — the drift window is in-memory, and we document that rather than engineer around it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout--stop">
+      <p><strong>The row that matters is the first.</strong> We changed the model family after the spec was written, and the latency budget it was written for no longer applies. That is stated here rather than discovered by a grader in <code>ARCHITECTURE.md</code>.</p>
+    </div>
+    <div class="notes"><b>0:45.</b> Do not read the table. Pick the model row and the ruff row — one shows a risk we accepted, one shows a speed we declined. Both prove the decision was made rather than defaulted.</div>
+  </div>
+</section>
+
+<section class="slide" data-sp="Thông" data-act="Application" data-min="0.5" data-t="Gate one: the data">
+  <div class="wrap">
+    <div class="eyebrow">07 · Deep dive · <em>gate one</em></div>
     <h2>The gate fails the run, it does not warn</h2>
     <div class="l-main-aside">
       <div class="tw">
@@ -501,35 +647,9 @@
   </div>
 </section>
 
-<!-- 07 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="0.75" data-t="Technology trade-offs">
+<section class="slide" data-sp="Duy" data-act="Application" data-min="0.5" data-t="Ten trials, an 11-point spread">
   <div class="wrap">
-    <div class="eyebrow">05 · Deep dive · <em>decisions</em></div>
-    <h2>What we chose, and what we gave up</h2>
-    <div class="tw">
-      <table>
-        <thead><tr><th>Decision</th><th>Chosen</th><th>Rejected</th><th>What it cost us</th></tr></thead>
-        <tbody>
-          <tr class="pick"><td class="k">Model</td><td class="k">PhoBERT-v2</td><td>XLM-RoBERTa · DistilBERT · TF-IDF</td><td>DistilBERT is English-only. We fine-tuned XLM-R first and PhoBERT second, then measured both on the same split: <strong>0.8457 vs 0.8337 macro-F1</strong>, and PhoBERT is half the size. The multilingual claim is what we gave up. The 200 ms budget survived: p95 <strong>98 ms</strong> on two CPUs.</td></tr>
-          <tr><td class="k">Drift measure</td><td class="k">PSI on input length</td><td>KS test · KL · Evidently</td><td>PSI has a conventional reading (&lt;0.1 / 0.1–0.2 / &gt;0.2), so the threshold is arguable rather than invented. It is coarser than KS.</td></tr>
-          <tr><td class="k">Fairness method</td><td class="k">Identity-pair probe (EEC)</td><td>Group-wise metrics · Fairlearn</td><td>The corpus has no demographic columns, so group metrics are impossible. The probe measures the model, not the population — a real limitation.</td></tr>
-          <tr><td class="k">Metrics</td><td class="k">In-process <code>prometheus_client</code></td><td>Sidecar exporter · StatsD</td><td>Drift and confidence are functions of the prediction, so a sidecar would mean shipping predictions to a second process. Cost: the API owns its own instrumentation.</td></tr>
-          <tr><td class="k">Lint chain</td><td class="k">flake8 + black + isort, pinned</td><td>ruff</td><td>ruff replaces all three and is far faster. We took consistency with the graded labs over speed, and pinned versions so a release cannot redden the build.</td></tr>
-          <tr><td class="k">Orchestration</td><td class="k">Docker Compose</td><td>Kubernetes</td><td>Required by the brief and right for one laptop. No horizontal scaling — the drift window is in-memory, and we document that rather than engineer around it.</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="callout callout--stop">
-      <p><strong>The row that matters is the first.</strong> We changed the model family after the spec was written, and the latency budget it was written for no longer applies. That is stated here rather than discovered by a grader in <code>ARCHITECTURE.md</code>.</p>
-    </div>
-    <div class="notes"><b>0:45.</b> Do not read the table. Pick the model row and the ruff row — one shows a risk we accepted, one shows a speed we declined. Both prove the decision was made rather than defaulted.</div>
-  </div>
-</section>
-
-<!-- 08 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Duy" data-act="Deep dive" data-min="1" data-t="Ten trials, an 11-point spread">
-  <div class="wrap">
-    <div class="eyebrow">06 · Deep dive · <em>experiments</em></div>
+    <div class="eyebrow">08 · Deep dive · <em>experiments</em></div>
     <h2>The search did real work</h2>
     <div class="l-fig-notes">
       <figure>
@@ -579,10 +699,9 @@
   </div>
 </section>
 
-<!-- 09 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Duy" data-act="Deep dive" data-min="1.25" data-t="Gate two, and the bug it caught">
+<section class="slide" data-sp="Duy" data-act="Application" data-min="1" data-t="Gate two, and the bug it caught">
   <div class="wrap">
-    <div class="eyebrow">07 · Deep dive · <em>gate two</em></div>
+    <div class="eyebrow">09 · Deep dive · <em>gate two</em></div>
     <h2>Promotion is a rule, not a decision</h2>
     <div class="l-main-aside">
       <div class="tw">
@@ -595,7 +714,7 @@
             <tr><td class="k">fairness gap</td><td class="n">≤ 0.10</td><td class="n">0.0000</td><td><span class="pill pill--go">pass</span></td><td>bias shipping because nobody re-measured</td></tr>
           </tbody>
         </table>
-        <p class="sm">These four are the <strong>baseline's</strong>, the model this gate promoted. The PhoBERT now serving was measured on the same split — macro-F1 <b>0.8457</b>, p95 <b>98 ms</b> — but it was <strong>imported, not gated</strong>: it arrived as weights from a notebook, and its fairness gap has never been measured. Running the gate against it is the honest next step, and we are not claiming it passed one.</p>
+        <p class="sm">These four are the <strong>baseline's</strong>, the model this gate promoted. The PhoBERT now serving was measured on the same split — macro-F1 <b>0.8457</b>, and <b>9 ms</b> on this table's own in-process measurement (<b>98 ms</b> end-to-end over HTTP) — but it was <strong>imported, not gated</strong>: it arrived as weights from a notebook, and its fairness gap has never been measured. Running the gate against it is the honest next step, and we are not claiming it passed one.</p>
       </div>
       <div class="card card--go">
         <h3>rollback</h3>
@@ -619,10 +738,9 @@
   </div>
 </section>
 
-<!-- 10 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="1.25" data-t="Serving: shed, don't queue">
+<section class="slide" data-sp="Sơn" data-act="Application" data-min="1" data-t="Serving: shed, don't queue">
   <div class="wrap">
-    <div class="eyebrow">08 · Deep dive · <em>serving under load</em></div>
+    <div class="eyebrow">10 · Deep dive · <em>serving under load</em></div>
     <h2>Three exits, and none of them block the loop</h2>
     <figure>
       <svg viewBox="0 0 1240 236" role="img" aria-label="Request lifecycle: a request acquires one of two semaphore slots within a one-second queue budget, runs in a thread pool under a thirty-second timeout, and exits as 200, 429 when the pool is full, or 504 on timeout.">
@@ -689,10 +807,9 @@
   </div>
 </section>
 
-<!-- 11 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Sơn" data-act="Deep dive" data-min="0.75" data-t="Atomic reload">
+<section class="slide" data-sp="Sơn" data-act="Application" data-min="0.5" data-t="Atomic reload">
   <div class="wrap">
-    <div class="eyebrow">09 · Deep dive · <em>atomic reload</em></div>
+    <div class="eyebrow">11 · Deep dive · <em>atomic reload</em></div>
     <h2>The replacement warms before it is published</h2>
     <figure>
       <svg viewBox="0 0 1240 150" role="img" aria-label="Atomic reload in three states: while warming the old model still serves; on success the pointer swaps in one assignment; on failure the old model keeps serving and the error is reported.">
@@ -734,10 +851,9 @@
   </div>
 </section>
 
-<!-- 12 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Huỳnh" data-act="Deep dive" data-min="0.75" data-t="Four kinds of test">
+<section class="slide" data-sp="Huỳnh" data-act="Application" data-min="0.5" data-t="Four kinds of test">
   <div class="wrap">
-    <div class="eyebrow">10 · Deep dive · <em>testing</em></div>
+    <div class="eyebrow">12 · Deep dive · <em>testing</em></div>
     <h2>Five categories, each catching what the others cannot</h2>
     <div class="tw">
       <table>
@@ -769,10 +885,39 @@
   </div>
 </section>
 
-<!-- 13 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Huỳnh" data-act="Deep dive" data-min="1" data-t="Drift, and the reference that makes it mean something">
+<section class="slide" data-sp="Huỳnh" data-act="Application" data-min="0.75" data-t="Ten alert rules">
   <div class="wrap">
-    <div class="eyebrow">11 · Deep dive · <em>monitoring</em></div>
+    <div class="eyebrow">13 · Application · <em>alerting</em></div>
+    <h2>Ten rules, each with a runbook and a reason to exist</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Alert</th><th class="n">Fires when</th><th class="n">for</th><th>Severity</th><th>What it is really watching</th></tr></thead>
+        <tbody>
+          <tr><td class="k">APIDown</td><td class="n"><code>up == 0</code></td><td class="n">1m</td><td><span class="pill pill--stop">critical</span></td><td>the service is gone, or Prometheus lost it</td></tr>
+          <tr><td class="k">ModelNotLoaded</td><td class="n"><code>ml_model_loaded == 0</code></td><td class="n">1m</td><td><span class="pill pill--stop">critical</span></td><td>process is alive but cannot answer — why <code>/health</code> and <code>/ready</code> are separate</td></tr>
+          <tr><td class="k">HighErrorRate</td><td class="n">5xx &gt; 5%</td><td class="n">5m</td><td><span class="pill pill--stop">critical</span></td><td>server faults only; 4xx is the client being wrong, not us</td></tr>
+          <tr><td class="k">HighPredictionErrorRate</td><td class="n">errors &gt; 5%</td><td class="n">5m</td><td><span class="pill pill--stop">critical</span></td><td>the model failing, even while HTTP looks healthy</td></tr>
+          <tr><td class="k">FairnessRegression</td><td class="n"><code>delta &gt; 0.10</code></td><td class="n">5m</td><td><span class="pill pill--stop">critical</span></td><td>the promotion threshold, re-checked in production</td></tr>
+          <tr><td class="k">HighLatencyP95</td><td class="n">p95 &gt; 500ms</td><td class="n">5m</td><td><span class="pill pill--warn">warning</span></td><td>2.5× the SLO — slack before paging</td></tr>
+          <tr><td class="k">DriftDetected</td><td class="n"><code>PSI &gt; 0.2</code></td><td class="n">10m</td><td><span class="pill pill--warn">warning</span></td><td>input distribution moving away from training</td></tr>
+          <tr><td class="k">PredictionSkew</td><td class="n">±20pp vs prior</td><td class="n">15m</td><td><span class="pill pill--warn">warning</span></td><td>output distribution moving, even if inputs did not</td></tr>
+          <tr><td class="k">FairnessUnmeasured</td><td class="n"><code>delta == 0</code> while serving</td><td class="n">30m</td><td><span class="pill">info</span></td><td>a model shipped without the measurement — <b>firing now, by design</b></td></tr>
+          <tr><td class="k">ModelStale</td><td class="n">7 days since reload</td><td class="n">1h</td><td><span class="pill">info</span></td><td>nobody has retrained in a semester</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="l-triad">
+      <div class="card"><h3>severity is a promise</h3><p><b>critical</b> means someone is woken; <b>warning</b> means it is looked at today; <b>info</b> means it is a fact on a dashboard. The <code>for</code> column is what stops a spike from becoming a page.</p></div>
+      <div class="card card--go"><h3>each one carries a runbook</h3><p>All <b>10/10</b> rules link to a section of <code>docs/user-guide.md</code>. An alert that says what broke but not what to do is a notification, not an alert.</p></div>
+      <div class="card card--warn"><h3>two are firing right now</h3><p><code>FairnessUnmeasured</code> and <code>DriftDetected</code> — both because the imported model shipped without a fairness measurement or a drift reference. <strong>We chose to leave them loud rather than silence them.</strong></p></div>
+    </div>
+    <div class="notes"><b>0:40.</b> Do not read the table. Point at the three severity bands, then say the last card out loud — the alerts that are firing are firing for a reason we can name, and we did not silence them to make the demo look clean.</div>
+  </div>
+</section>
+
+<section class="slide" data-sp="Huỳnh" data-act="Application" data-min="0.75" data-t="Drift, and the reference that makes it mean something">
+  <div class="wrap">
+    <div class="eyebrow">14 · Deep dive · <em>monitoring</em></div>
     <h2>The reference has to travel with the model</h2>
     <div class="l-fig-notes">
       <figure>
@@ -826,10 +971,9 @@
   </div>
 </section>
 
-<!-- 14 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Huỳnh" data-act="Deep dive" data-min="0.75" data-t="CI/CD">
+<section class="slide" data-sp="Huỳnh" data-act="Application" data-min="0.5" data-t="CI/CD">
   <div class="wrap">
-    <div class="eyebrow">12 · Deep dive · <em>ci/cd</em></div>
+    <div class="eyebrow">15 · Deep dive · <em>ci/cd</em></div>
     <h2>lint → type → test → build → scan → publish</h2>
     <div class="l-main-aside">
       <div style="display:grid;gap:11px">
@@ -855,10 +999,9 @@
   </div>
 </section>
 
-<!-- 15 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Nhiên" data-act="Responsible AI" data-min="1.75" data-t="Fairness: measured, mitigated, gated">
+<section class="slide" data-sp="Nhiên" data-act="Responsible AI" data-min="1.25" data-t="Fairness: measured, mitigated, gated">
   <div class="wrap">
-    <div class="eyebrow">13 · Responsible AI · <em>the measurement</em></div>
+    <div class="eyebrow">16 · Responsible AI · <em>the measurement</em></div>
     <h2>Two sentences, one word apart</h2>
     <div class="l-fig-notes">
       <figure>
@@ -935,10 +1078,9 @@
   </div>
 </section>
 
-<!-- 16 ══════════════════════════════════════════ -->
 <section class="slide" data-sp="Nhiên" data-act="Responsible AI" data-min="0.75" data-t="Explainability &amp; refusal">
   <div class="wrap">
-    <div class="eyebrow">14 · Responsible AI · <em>explainability &amp; ethics</em></div>
+    <div class="eyebrow">17 · Responsible AI · <em>explainability &amp; ethics</em></div>
     <h2>The model reads the concession</h2>
     <div class="l-aside-main">
       <div class="code">
@@ -965,44 +1107,55 @@
   </div>
 </section>
 
-<!-- 17 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Sơn + Huỳnh" data-act="Demo" data-min="1.75" data-t="Live demo">
+<section class="slide" data-sp="cả nhóm" data-act="Results" data-min="0.75" data-t="What we achieved">
   <div class="wrap">
-    <div class="eyebrow">15 · Live demo · <em>1:45</em></div>
-    <h2>Seven commands against a running stack</h2>
+    <div class="eyebrow">18 · Results · <em>measured, not claimed</em></div>
+    <h2>Every number here was re-measured, not quoted</h2>
+    <div class="stats">
+      <div class="stat"><span class="stat__v">0.8457</span><span class="stat__l">macro-F1</span></div>
+      <div class="stat"><span class="stat__v">0.9416</span><span class="stat__l">accuracy</span></div>
+      <div class="stat"><span class="stat__v">98 ms</span><span class="stat__l">p95 latency</span></div>
+      <div class="stat"><span class="stat__v">202</span><span class="stat__l">tests · 91.8% cover</span></div>
+      <div class="stat"><span class="stat__v">6/6</span><span class="stat__l">services healthy</span></div>
+    </div>
     <div class="l-main-aside">
-      <div class="code">
-        <span class="d">1</span> docker compose ps <span class="d">………………… six healthy services</span><br>
-        <span class="d">2</span> curl /api/v1/model/info <span class="d">………… phobert · v5 · Production</span><br>
-        <span class="d">3</span> curl /api/v1/predict <span class="d">……………… positive · negative · neutral</span><br>
-        <span class="d">4</span> curl /api/v1/predict/batch <span class="d">……… empty item isolated, batch survives</span><br>
-        <span class="d">5</span> curl /api/v1/explain <span class="d">……………… token attributions · 15–20s, wait for it</span><br>
-        <span class="d">6</span> Grafana → Sentiment <span class="d">………………… three dashboards, populated</span><br>
-        <span class="d">7</span> load_test.py --scenario drift <span class="d">…… DriftDetected goes pending</span>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Model</th><th class="n">macro-F1</th><th class="n">accuracy</th><th class="n">size</th><th>How it got here</th></tr></thead>
+          <tbody>
+            <tr><td class="k">TF-IDF + LogReg</td><td class="n">0.7149</td><td class="n">0.8629</td><td class="n">0.6 MB</td><td>trained here, passed the gate, registry v2</td></tr>
+            <tr><td class="k">XLM-RoBERTa</td><td class="n">0.8337</td><td class="n">0.9359</td><td class="n">1.1 GB</td><td>fine-tuned on Kaggle, imported</td></tr>
+            <tr class="pick"><td class="k">PhoBERT-v2</td><td class="n">0.8457</td><td class="n">0.9416</td><td class="n">527 MB</td><td>fine-tuned on Kaggle, <b>serving now</b></td></tr>
+          </tbody>
+        </table>
+        <p class="sm">All three on the same 3,166-row held-out split. The winner is half the size of
+        the runner-up and <strong>13 points of macro-F1 above the baseline it replaced</strong>.</p>
       </div>
-      <div style="display:grid;gap:10px">
-        <div class="card card--stop">
-          <h3>rules we do not break</h3>
-          <p><strong>Pre-warm the stack.</strong> Never <code>up --build</code> in front of the room.</p>
-          <p style="margin-top:5px"><strong>MLflow is on 5001.</strong> Port 5000 belongs to macOS AirPlay Receiver, which answers 403 while MLflow is perfectly healthy — so the stack publishes 5001 and nobody has to change a machine setting.</p>
-          <p style="margin-top:5px"><strong>Start with <code>API_CPU_LIMIT=6.0</code>.</strong> On two CPUs one explanation takes 15–20 s; on six it takes about 4 s. Command 5 is the only one that makes the room wait.</p>
+      <div style="display:grid;gap:12px">
+        <div class="card card--go">
+          <h3>what is demonstrably true</h3>
+          <p>Six services healthy from one command · a versioned HTTP contract with 12/12 documented
+          schemas · admission control that sheds instead of queueing · 10 alert rules, one of them
+          driven to <code>FIRING</code> live · a promotion gate that has actually refused a model.</p>
         </div>
-        <div class="card">
-          <h3>handover</h3>
-          <p>Sơn drives 1–5, Huỳnh drives 6–7. Agreed out loud before starting, so it does not get negotiated on stage.</p>
+        <div class="card card--stop">
+          <h3>what we will not overclaim</h3>
+          <p>The deployed transformer was <strong>imported, not gated</strong> — its fairness gap is
+          unmeasured. It ships no drift reference. Neither is hidden: both are firing alerts right
+          now, which is the behaviour we designed for.</p>
         </div>
       </div>
     </div>
-    <div class="callout"><p>Every response is saved as a fallback slide in a second window. The demo is <strong>15%</strong> of the presentation mark and the only part that can fail publicly.</p></div>
-    <div class="notes"><b>1:45.</b> Rehearse until boring. If the stack misbehaves, switch to fallbacks without commentary — narrating a failure costs more time than the failure does.</div>
+    <div class="notes"><b>0:55.</b> The payoff slide. Lead with the table — three models, same split,
+    one sentence each. Then the two cards, in order: what is true, then what we refuse to overclaim.
+    Saying the second half yourself is what makes the first half believable.</div>
   </div>
 </section>
 
-<!-- 18 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="cả nhóm" data-act="Close" data-min="0.75" data-t="What we got wrong">
+<section class="slide" data-sp="cả nhóm" data-act="Results" data-min="0.75" data-t="What we got wrong">
   <div class="wrap">
-    <div class="eyebrow">16 · Retrospective</div>
-    <h2>Five things we got wrong</h2>
+    <div class="eyebrow">19 · Retrospective</div>
+    <h2>Seven things we got wrong</h2>
     <div class="tw">
       <table>
         <thead><tr><th>What</th><th>How it was caught</th><th>What changed</th></tr></thead>
@@ -1028,30 +1181,65 @@
   </div>
 </section>
 
-<!-- 19 ══════════════════════════════════════════ -->
-<section class="slide" data-sp="Nhiên" data-act="Close" data-min="0.5" data-t="Close">
+<section class="slide" data-sp="Sơn + Huỳnh" data-act="Demo" data-min="1.5" data-t="Live demo">
   <div class="wrap">
-    <div class="eyebrow">17 · Close</div>
-    <h2>What is deployed, and what is honest</h2>
-    <div class="stats">
-      <div class="stat"><span class="stat__v">0.8457</span><span class="stat__l">macro-F1</span></div>
-      <div class="stat"><span class="stat__v">0.9416</span><span class="stat__l">accuracy</span></div>
-      <div class="stat"><span class="stat__v">98 ms</span><span class="stat__l">p95 latency</span></div>
-      <div class="stat"><span class="stat__v">91%</span><span class="stat__l">coverage</span></div>
-      <div class="stat"><span class="stat__v">10</span><span class="stat__l">alerts + runbooks</span></div>
-    </div>
-    <div class="l-split">
-      <div class="card card--go">
-        <h3>deployed</h3>
-        <p>A monitored, explainable service serving a fine-tuned transformer that <strong>beat the baseline by 13 points of macro-F1 and still fits the 200 ms budget</strong>. Every prediction traces back to an MLflow run carrying its params and its data fingerprint, and swapping the model is one environment variable.</p>
+    <div class="eyebrow">20 · Live demo · <em>1:45</em></div>
+    <h2>Seven commands against a running stack</h2>
+    <div class="l-main-aside">
+      <div class="code">
+        <span class="d">1</span> docker compose ps <span class="d">………………… six healthy services</span><br>
+        <span class="d">2</span> curl /api/v1/model/info <span class="d">………… phobert · v5 · Production</span><br>
+        <span class="d">3</span> curl /api/v1/predict <span class="d">……………… positive · negative · neutral</span><br>
+        <span class="d">4</span> curl /api/v1/predict/batch <span class="d">……… empty item isolated, batch survives</span><br>
+        <span class="d">5</span> curl /api/v1/explain <span class="d">……………… token attributions · 15–20s, wait for it</span><br>
+        <span class="d">6</span> Grafana → Sentiment <span class="d">………………… three dashboards, populated</span><br>
+        <span class="d">7</span> load_test.py --scenario drift <span class="d">…… DriftDetected goes pending</span>
       </div>
-      <div class="card card--stop">
-        <h3>honest gaps</h3>
-        <p>The deployed transformer was <strong>imported, not gated</strong> — its fairness gap is unmeasured, so <code>FairnessUnmeasured</code> fires by design rather than being silenced. It ships no drift reference, so <code>DriftDetected</code> is currently measuring against a placeholder. Both are one script away, and neither is hidden behind a green dashboard.</p>
+      <div style="display:grid;gap:10px">
+        <div class="card card--stop">
+          <h3>rules we do not break</h3>
+          <p><strong>Pre-warm the stack.</strong> Never <code>up --build</code> in front of the room.</p>
+          <p style="margin-top:5px"><strong>MLflow is on 5001.</strong> Port 5000 belongs to macOS AirPlay Receiver, which answers 403 while MLflow is perfectly healthy — so the stack publishes 5001 and nobody has to change a machine setting.</p>
+          <p style="margin-top:5px"><strong>Start with <code>API_CPU_LIMIT=6.0</code>.</strong> On two CPUs one explanation takes 15–20 s; on six it takes about 4 s. Command 5 is the only one that makes the room wait.</p>
+        </div>
+        <div class="card">
+          <h3>handover</h3>
+          <p>Sơn drives 1–5, Huỳnh drives 6–7. Agreed out loud before starting, so it does not get negotiated on stage.</p>
+        </div>
       </div>
     </div>
-    <p class="lead">Questions.</p>
-    <div class="notes"><b>0:30.</b> Hand to Q&amp;A. Each member owns their own area — three prepared questions each in <code>docs/QA_PREP.md</code>.</div>
+    <div class="callout"><p>Every response is saved as a fallback slide in a second window. The demo is the only part of this presentation that can fail publicly.</p></div>
+    <div class="notes"><b>1:45.</b> Rehearse until boring. If the stack misbehaves, switch to fallbacks without commentary — narrating a failure costs more time than the failure does.</div>
+  </div>
+</section>
+
+<section class="slide" data-sp="cả nhóm" data-act="Close" data-min="0.5" data-t="Thank you">
+  <div class="wrap">
+    <div class="l-main-aside">
+      <div style="display:grid;gap:18px">
+        <h1>Cảm ơn.</h1>
+        <p class="lead">Questions — each member answers for their own area, and every claim in this
+        deck traces to a command you can run against the stack.</p>
+        <div class="stats">
+          <div class="stat"><span class="stat__v">0.8457</span><span class="stat__l">macro-F1, deployed</span></div>
+          <div class="stat"><span class="stat__v">18:00</span><span class="stat__l">as promised</span></div>
+        </div>
+      </div>
+      <div style="display:grid;gap:12px">
+        <div class="tw"><table><tbody>
+          <tr><td class="k">Lý Minh Thông</td><td class="sm">Data &amp; Features</td></tr>
+          <tr><td class="k">Dương Thành Duy</td><td class="sm">Training &amp; Experiments</td></tr>
+          <tr><td class="k">Bùi Vân Sơn</td><td class="sm">Serving &amp; Containers</td></tr>
+          <tr><td class="k">Lê Công Huỳnh</td><td class="sm">Monitoring &amp; CI/CD</td></tr>
+          <tr><td class="k">Thái Bình Nhiên</td><td class="sm">Responsible AI &amp; Docs</td></tr>
+        </tbody></table></div>
+        <div class="card"><h3>everything is in the repository</h3>
+          <p><code>README.md</code> to run it · <code>ARCHITECTURE.md</code> for the diagrams ·
+          <code>docs/QA_PREP.md</code> for the questions we prepared for.</p></div>
+      </div>
+    </div>
+    <div class="notes"><b>0:30.</b> Hand to Q&amp;A. Do not summarise again — the results slide already
+    did that. Whoever owns the area takes the question; nobody answers for someone else.</div>
   </div>
 </section>
 

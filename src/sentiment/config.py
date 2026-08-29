@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     local_model_dir: Path = Path("artifacts/xlm-roberta")
     reload_token: str | None = None
     build_revision: str = "unknown"
+    # Serves the browser console at /ui. On by default because this deployment is
+    # a teaching artifact people are meant to poke at; a service that does not
+    # want a console sharing a port with its API turns it off here.
+    enable_ui: bool = True
 
     model_name: str = "xlm-roberta-base"
     model_dataset_name: str = "tridm/UIT-VSFC"
