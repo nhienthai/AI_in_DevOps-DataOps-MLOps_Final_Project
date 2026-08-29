@@ -7,13 +7,13 @@ it has to land. Everything on a slide is a fact from the repo, not a claim.
 of slack inside the 15–20 window. Add them up again if you change any of them — an
 earlier draft of this table summed to 20:30 and would have overrun the cap.
 
-Rehearse to 18. If you overrun, the demo is what gets squeezed, and the demo is 15% of
-the presentation mark — so cut slide 4 or 11 instead.
+Rehearse to 18. If you overrun, do not squeeze the demo — it is the only part that
+cannot be recovered by talking faster. Cut a Deep-dive slide instead.
 
 **Rule for every slide:** no bullet without a number or a file path behind it.
 
 **The deck is built.** [`docs/deck.html`](deck.html) — open it in any browser, no build
-step and no network. `←` `→` to move, `G` for an overview of all sixteen slides with
+step and no network. `←` `→` to move, `G` for an overview of all twenty-one slides with
 speaker and time, `N` to toggle speaker notes. The rail shows the current speaker and the
 running total against the 18:00 budget, both derived from the slides themselves, so they
 cannot drift from this table.

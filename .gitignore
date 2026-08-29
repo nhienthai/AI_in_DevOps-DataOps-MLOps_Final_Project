@@ -4,9 +4,20 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+# Anchored like /models/ below: setuptools writes ./build and ./dist, but an
+# unanchored rule would also swallow a legitimate nested build/ directory.
+# Left untracked these go stale silently — build/lib/ already held a copy of
+# serving/app.py that no longer matched src/.
+/build/
+/dist/
 
 # Environment
 .env
+.env.local
+.env.*.local
+# Belt and braces: anything else .env-shaped is a secret unless proven otherwise.
+.env.*
+!.env.example
 
 # Data & models (never commit)
 data/raw/
@@ -43,3 +54,16 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+*.swp
+
+# Claude Code
+# .claude/skills/ IS tracked on purpose — CLAUDE.md points reviewers at those two
+# skills, so they are project documentation. Only the machine-local settings and
+# transcripts are ignored.
+.claude
+CLAUDE.md
+
+# Tooling caches
+.tox/
+.nox/
+.cache/

@@ -75,6 +75,7 @@ prometheus     Up 20 seconds (healthy)
 |---|---|
 | API | http://localhost:8000 |
 | Swagger UI | http://localhost:8000/docs |
+| Test console | http://localhost:8000/ui |
 | MLflow | http://localhost:5001 |
 | Prometheus | http://localhost:9090 |
 | Alertmanager | http://localhost:9093 |
@@ -350,7 +351,16 @@ make typecheck    # mypy
 make test         # pytest with the coverage gate
 make smoke        # integration tests against a running stack
 pytest -m slow    # model behaviour tests; downloads the dataset
+
+python scripts/latency_bench.py            # p50/p95/p99 grid, exits 1 if p95 blows the budget
+python scripts/load_test.py --scenario all # traffic so the dashboards and alerts have something to show
 ```
+
+The two traffic scripts answer different questions. `load_test.py` drives the
+dashboards and fires alert rules; `latency_bench.py` measures — it discards a
+warm-up phase, separates the server's own inference time from the queueing the
+client sees, and sweeps batch size against concurrency to find where admission
+control starts shedding.
 
 Configuration comes from `SENTIMENT_`-prefixed environment variables or `.env`. See
 [`src/sentiment/config.py`](src/sentiment/config.py) for every setting and its default.
